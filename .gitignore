@@ -1,0 +1,4 @@
+# All PyCharm
+.DS_Store
+.idea/
+.venv

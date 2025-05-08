@@ -16,8 +16,10 @@ from PyQt6.QtCore import pyqtSignal, QThread, Qt
 
 from datetime import datetime
 
-FIRMWARE_MAJOR_VERSION = 2
-FIRMWARE_MINOR_VERSION = 2
+PROGRAMMER_MAJOR_VERSION = 0
+PROGRAMMER_MINOR_VERSION = 1
+
+FIRMWARE_UPDATED = False
 
 
 def download_microSWIFT_firmware():
@@ -45,6 +47,7 @@ def download_microSWIFT_firmware():
     except requests.RequestException as e:
         print(f"Failed to download the firmware file: {e}")
         return False
+
 
 class Worker(QThread):
     finished = pyqtSignal()
@@ -136,7 +139,6 @@ class Worker(QThread):
                 self.stderrAvailable.emit(e.stdout)
             except Exception as e:
                 self.writeError(f"Unexpected error: {str(e)}")
-
 
         self.finished.emit()
 
@@ -475,7 +477,9 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "microSWIFT Configurator"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "microSWIFT Configurator Version "
+                                                           "{major}.{minor}".format(major=PROGRAMMER_MAJOR_VERSION,
+                                                                                    minor=PROGRAMMER_MINOR_VERSION)))
         self.ctEnableButton.setText(_translate("MainWindow", "Enable CT"))
         self.tempEnableButton.setText(_translate("MainWindow", "Enable Temperature"))
         self.lightEnableButton.setText(_translate("MainWindow", "Enable Light"))
@@ -513,55 +517,60 @@ class Ui_MainWindow(object):
         self.statusTextEdit.setFont(QFont("Courier New"))
 
         (self.writeText
-        ("           _        "
-         "       ______       "
-         " _____ _____ _____  "
-         "   \r\n"
-         " _ __ ___ (_) ___ _ "
-         "__ ___/ ___\\ \\    "
-         "  / /_ _|  ___|_   _"
-         "|    \r\n"
-         "| \'_ ` _ \\| |/ __|"
-         " \'__/ _ \\___ \\\\ "
-         "\\ /\\ / / | || |_  "
-         "  | |      \r\n"
-         "| | | | | | | (__| |"
-         " | (_) |__) |\\ V  V"
-         " /  | ||  _|   | |  "
-         "    \r\n"
-         "|_|_|_| |_|_|\\___|_"
-         "|  \\___/____/  \\_/"
-         "\\_/  |___|_|     |_"
-         "|      \r\n"
-         "|  _ \\ _ __ ___   _"
-         "_ _ _ __ __ _ _ __ _"
-         "__  _ __ ___   ___ _"
-         " __ \r\n"
-         "| |_) | \'__/ _ \\ /"
-         " _` | \'__/ _` | \'_"
-         " ` _ \\| \'_ ` _ \\ "
-         "/ _ \\ \'__|\r\n"
-         "|  __/| | | (_) | (_"
-         "| | | | (_| | | | | "
-         "| | | | | | |  __/ |"
-         "   \r\n"
-         "|_|   |_|  \\___/ \\"
-         "__, |_|  \\__,_|_| |"
-         "_| |_|_| |_| |_|\\__"
-         "_|_|   \r\n"
-         "                 |__"
-         "_/                  "
-         "                    "
-         "   "
-         "\r\r\nDon't forget to update this tool!!! Insert repo link here."))
+         ("           _        "
+          "       ______       "
+          " _____ _____ _____  "
+          "   \r\n"
+          " _ __ ___ (_) ___ _ "
+          "__ ___/ ___\\ \\    "
+          "  / /_ _|  ___|_   _"
+          "|    \r\n"
+          "| \'_ ` _ \\| |/ __|"
+          " \'__/ _ \\___ \\\\ "
+          "\\ /\\ / / | || |_  "
+          "  | |      \r\n"
+          "| | | | | | | (__| |"
+          " | (_) |__) |\\ V  V"
+          " /  | ||  _|   | |  "
+          "    \r\n"
+          "|_|_|_| |_|_|\\___|_"
+          "|  \\___/____/  \\_/"
+          "\\_/  |___|_|     |_"
+          "|      \r\n"
+          "|  _ \\ _ __ ___   _"
+          "_ _ _ __ __ _ _ __ _"
+          "__  _ __ ___   ___ _"
+          " __ \r\n"
+          "| |_) | \'__/ _ \\ /"
+          " _` | \'__/ _` | \'_"
+          " ` _ \\| \'_ ` _ \\ "
+          "/ _ \\ \'__|\r\n"
+          "|  __/| | | (_) | (_"
+          "| | | | (_| | | | | "
+          "| | | | | | |  __/ |"
+          "   \r\n"
+          "|_|   |_|  \\___/ \\"
+          "__, |_|  \\__,_|_| |"
+          "_| |_|_| |_| |_|\\__"
+          "_|_|   \r\n"
+          "                 |__"
+          "_/                  "
+          "                    "
+          "   "
+          "\r\r\nVisit https://github.com/SASlabgroup/microSWIFT-programmer and"
+          " verify the most current version."))
 
+        if FIRMWARE_UPDATED:
+            self.appendText("Firmware successfully updated from GitHub.")
+        else:
+            self.appendText("Firmware was not updated from GitHub. Please ensure microSWIFT_V2.2.elf is up-to-date!")
 
     def assembleBinaryConfigFile(self):
         get_int_from_str = lambda s: int(re.search(r'\d+', s).group()) if re.search(r'\d+', s) else None
 
         with open(self.configFilePath, "wb") as configFile:
             '''
-            
+
             Definition of configuration struct from configuration.h in firmware files
 
             typedef struct __attribute__((packed)) microSWIFT_configuration
@@ -575,20 +584,20 @@ class Ui_MainWindow(object):
               uint32_t total_light_samples;
               uint32_t light_sensor_gain;
               uint32_t total_turbidity_samples;
-            
+
               bool iridium_v3f;
               bool gnss_high_performance_mode;
               bool ct_enabled;
               bool temperature_enabled;
               bool light_enabled;
               bool turbidity_enabled;
-            
+
               const char compile_date_flash[11];
               const char compile_time_flash[9];
             } microSWIFT_configuration;
-            
+
             In microSWIFT.ld:
-            
+
               /* Custom variables (firmware version, compile date/time, etc) */
               .uservars :
               {
@@ -725,7 +734,7 @@ class Ui_MainWindow(object):
         if self.lightMatchGNSSCheckbox.isChecked():
             self.lightNumSamplesSpinBox.setDisabled(True)
             self.lightNumSamplesSpinBox.setValue(int((self.gnssNumSamplesSpinBox.value() /
-                                                     get_int_from_str(self.gnssSampleRateComboBox.currentText()) / 2)))
+                                                      get_int_from_str(self.gnssSampleRateComboBox.currentText()) / 2)))
 
         self.resetVerifyButton()
 
@@ -978,11 +987,9 @@ class Ui_MainWindow(object):
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
+    FIRMWARE_UPDATED = download_microSWIFT_firmware()
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
-    firmware_updated = download_microSWIFT_firmware()
-    if not firmware_updated:
-        sys.exit(1)
     MainWindow.show()
     sys.exit(app.exec())
 
