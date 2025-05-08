@@ -21,7 +21,6 @@ PROGRAMMER_MINOR_VERSION = 1
 
 FIRMWARE_UPDATED = False
 
-
 def download_microSWIFT_firmware():
     # Raw file URL on GitHub
     url = "https://github.com/SASlabgroup/microSWIFT-V2-Binaries/raw/main/V2.2/microSWIFT_V2.2.elf"
@@ -107,40 +106,42 @@ class Worker(QThread):
             self.writeError(f"Unexpected error: {str(e)}")
             firmwareBurnSuccessful = False
 
-        if firmwareBurnSuccessful:
-            command = [
-                programmerPath,
-                "--connect", "port=SWD",  # Specify the port (e.g., USB, JTAG)
-                "--download", "firmware/config.bin",  # Firmware file to write to the device
-                "0x083FFC00",  # download address
-                "--verify",  # Verify after programming
-                "--start", "0x08000000"  # Start after programming and verification (at address 0x08000000)
-            ]
+        finally:
+            if firmwareBurnSuccessful:
+                command = [
+                    programmerPath,
+                    "--connect", "port=SWD",  # Specify the port (e.g., USB, JTAG)
+                    "--download", "firmware/config.bin",  # Firmware file to write to the device
+                    "0x083FFC00",  # download address
+                    "--verify",  # Verify after programming
+                    "--start", "0x08000000"  # Start after programming and verification (at address 0x08000000)
+                ]
 
-            # Burn the configuration bytes
-            try:
-                process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                # Burn the configuration bytes
+                try:
+                    process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-                # Do other work while the subprocess is running
-                while process.poll() is None:
-                    # Retrieve output (if needed)
-                    stdout, stderr = process.communicate()
+                    # Do other work while the subprocess is running
+                    while process.poll() is None:
+                        # Retrieve output (if needed)
+                        stdout, stderr = process.communicate()
 
-                    if stdout:
-                        cleanedText = re.sub(r'\x1b\[[0-9;]*[mG]', '', stdout)
-                        self.stdoutAvailable.emit(cleanedText)
+                        if stdout:
+                            cleanedText = re.sub(r'\x1b\[[0-9;]*[mG]', '', stdout)
+                            self.stdoutAvailable.emit(cleanedText)
 
-                if process.returncode != 0:
-                    self.stderrAvailable.emit(f"\nProgramming Failed with code {process.returncode}")
+                    if process.returncode != 0:
+                        self.stderrAvailable.emit(f"\nProgramming Failed with code {process.returncode}")
 
-            except subprocess.CalledProcessError as e:
-                # If there's an error, show the error message
-                self.stderrAvailable.emit(f"/nError: {e.stderr}")
-                self.stderrAvailable.emit(e.stdout)
-            except Exception as e:
-                self.writeError(f"Unexpected error: {str(e)}")
+                except subprocess.CalledProcessError as e:
+                    # If there's an error, show the error message
+                    self.stderrAvailable.emit(f"/nError: {e.stderr}")
+                    self.stderrAvailable.emit(e.stdout)
+                except Exception as e:
+                    self.writeError(f"Unexpected error: {str(e)}")
 
-        self.finished.emit()
+                finally:
+                    self.finished.emit()
 
 
 class Ui_MainWindow(object):
@@ -155,7 +156,7 @@ class Ui_MainWindow(object):
         self.centralwidget = QtWidgets.QWidget(parent=MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.ctFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.ctFrame.setGeometry(QtCore.QRect(10, 10, 301, 91))
+        self.ctFrame.setGeometry(QtCore.QRect(10, 10, 301, 81))
         self.ctFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.ctFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.ctFrame.setObjectName("ctFrame")
@@ -169,18 +170,18 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(12)
         self.ctEnableButton.setFont(font)
-        self.ctEnableButton.setObjectName("ctEnableButton")
         self.ctEnableButton.setAutoExclusive(False)
+        self.ctEnableButton.setObjectName("ctEnableButton")
         self.ctVertLayout.addWidget(self.ctEnableButton)
         self.tempEnableButton = QtWidgets.QRadioButton(parent=self.layoutWidget)
         font = QtGui.QFont()
         font.setPointSize(12)
         self.tempEnableButton.setFont(font)
-        self.tempEnableButton.setObjectName("tempEnableButton")
         self.tempEnableButton.setAutoExclusive(False)
+        self.tempEnableButton.setObjectName("tempEnableButton")
         self.ctVertLayout.addWidget(self.tempEnableButton)
         self.lightFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.lightFrame.setGeometry(QtCore.QRect(10, 110, 301, 131))
+        self.lightFrame.setGeometry(QtCore.QRect(10, 100, 301, 131))
         self.lightFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.lightFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.lightFrame.setObjectName("lightFrame")
@@ -237,7 +238,7 @@ class Ui_MainWindow(object):
         self.lightSamplesHorizLayout.addWidget(self.lightNumSamplesSpinBox)
         self.lightVerticalLayout.addLayout(self.lightSamplesHorizLayout)
         self.iridiumFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.iridiumFrame.setGeometry(QtCore.QRect(10, 370, 301, 80))
+        self.iridiumFrame.setGeometry(QtCore.QRect(10, 360, 301, 80))
         self.iridiumFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.iridiumFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.iridiumFrame.setObjectName("iridiumFrame")
@@ -280,7 +281,7 @@ class Ui_MainWindow(object):
         self.iridiumTypeHorizLayoutr.addWidget(self.iridiumTypeLabel)
         self.iridiumVertLayout.addLayout(self.iridiumTypeHorizLayoutr)
         self.gnssFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.gnssFrame.setGeometry(QtCore.QRect(10, 459, 301, 111))
+        self.gnssFrame.setGeometry(QtCore.QRect(10, 450, 301, 111))
         self.gnssFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.gnssFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.gnssFrame.setObjectName("gnssFrame")
@@ -393,7 +394,7 @@ class Ui_MainWindow(object):
         self.graphicsView.setGeometry(QtCore.QRect(320, 10, 311, 231))
         self.graphicsView.setObjectName("graphicsView")
         self.statusAndProgFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.statusAndProgFrame.setGeometry(QtCore.QRect(340, 430, 271, 141))
+        self.statusAndProgFrame.setGeometry(QtCore.QRect(340, 420, 271, 141))
         self.statusAndProgFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.statusAndProgFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.statusAndProgFrame.setObjectName("statusAndProgFrame")
@@ -420,7 +421,7 @@ class Ui_MainWindow(object):
         self.programButton.setObjectName("programButton")
         self.statusAndProgVertLayout.addWidget(self.programButton)
         self.turbidityFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.turbidityFrame.setGeometry(QtCore.QRect(10, 250, 301, 111))
+        self.turbidityFrame.setGeometry(QtCore.QRect(10, 240, 301, 111))
         self.turbidityFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.turbidityFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.turbidityFrame.setObjectName("turbidityFrame")
@@ -466,7 +467,7 @@ class Ui_MainWindow(object):
         self.turbiditySamplesHorizLayout.addWidget(self.turbidityNumSamplesSpinBox)
         self.turbidityVerticalLayout.addLayout(self.turbiditySamplesHorizLayout)
         self.statusTextEdit = QtWidgets.QTextEdit(parent=self.centralwidget)
-        self.statusTextEdit.setGeometry(QtCore.QRect(10, 580, 621, 211))
+        self.statusTextEdit.setGeometry(QtCore.QRect(10, 570, 621, 221))
         self.statusTextEdit.setObjectName("statusTextEdit")
         MainWindow.setCentralWidget(self.centralwidget)
 
@@ -557,13 +558,13 @@ class Ui_MainWindow(object):
           "_/                  "
           "                    "
           "   "
-          "\r\r\nVisit https://github.com/SASlabgroup/microSWIFT-programmer and"
-          " verify the most current version."))
+          "\r\r\nPlease ensure you are running the most recent version of this tool."
+          "\r\nVisit https://github.com/SASlabgroup/microSWIFT-programmer"))
 
         if FIRMWARE_UPDATED:
             self.appendText("Firmware successfully updated from GitHub.")
         else:
-            self.appendText("Firmware was not updated from GitHub. Please ensure microSWIFT_V2.2.elf is up-to-date!")
+            self.appendError("Unable to pull firmware from GitHub!")
 
     def assembleBinaryConfigFile(self):
         get_int_from_str = lambda s: int(re.search(r'\d+', s).group()) if re.search(r'\d+', s) else None
