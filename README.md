@@ -1,6 +1,6 @@
 # microSWIFT-programmer
 
-Installation:
+Installation and Usage:
 
 1) [Install Python](https://www.python.org/downloads/)
 2) In a terminal, install Python dependencies
@@ -8,7 +8,9 @@ Installation:
 python -m pip install --upgrade pip
 python -m pip install PyQt6, PySerial, requests
 ```
-3) Run the program
+3) Clone or download this repo to a location of your choice
+4) Open a terminal and navigate to where you cloned/downloaded this repo
+5) Run the program
 ```shell
 python microSWIFT_programmer.py
 ```
