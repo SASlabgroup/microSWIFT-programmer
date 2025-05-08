@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+
 import platform
 import struct
 import sys
@@ -41,10 +42,8 @@ def download_microSWIFT_firmware():
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        print("Firmware file downloaded and saved successfully.")
         return True
     except requests.RequestException as e:
-        print(f"Failed to download the firmware file: {e}")
         return False
 
 
