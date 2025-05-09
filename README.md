@@ -19,4 +19,9 @@ Notes:
 
 The application lists the version number in the window top banner. This repo is set up such that the default branch is the most recent version of the program. Please ensure the version you are running on your local machine matches the version listed in the default branch within this repo.
 
-On startup, the application downloads the V2.2 firmware binary file "microSWIFT_V2.2.elf" to the local "firmware" folder to ensure the most recent copy of firmware is burned to the device. If the application is unable to download this file (network issue, etc.), an error will appear indicating so. If this is to occur, users must ensure the firmware folder contains the most recent copy of "microSWIFT_V2.2.elf", which can be downloaded from [the microSWIFT binaries repo](https://github.com/SASlabgroup/microSWIFT-V2-Binaries/tree/main) under the V2.2 folder.
+On startup, the application downloads the V2.2 firmware binary file "microSWIFT_V2.2.elf" to the local "firmware" folder to ensure the most recent copy of firmware is burned to the device. If the application is unable to download this file (network issue, etc.), an error will appear indicating so. If this is to occur, users must ensure the firmware folder contains the most recent copy of "microSWIFT_V2.2.elf", which can be downloaded from [the microSWIFT binaries repo](https://github.com/SASlabgroup/microSWIFT-V2-Binaries/tree/main) under the V2.2 folder. 
+
+To bypass the firmware update functionality, pass the flag "--no_firmware_update":
+```shell
+python microSWIFT_programmer.py --no_firmware_update
+```
