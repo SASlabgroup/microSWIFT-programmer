@@ -142,6 +142,8 @@ class Worker(QThread):
 
                 finally:
                     self.finished.emit()
+            else:
+                self.finished.emit()
 
 
 class Ui_MainWindow(object):
