@@ -985,9 +985,13 @@ class Ui_MainWindow(object):
 
 
 if __name__ == "__main__":
+    arguments = []
+    if len(sys.argv) > 1:
+        arguments = sys.argv[1:]
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
-    FIRMWARE_UPDATED = download_microSWIFT_firmware()
+    if not arguments[0] == "--no_firmware_update":
+        FIRMWARE_UPDATED = download_microSWIFT_firmware()
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
     MainWindow.show()
