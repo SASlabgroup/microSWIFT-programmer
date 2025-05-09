@@ -20,6 +20,7 @@ from datetime import datetime
 PROGRAMMER_MAJOR_VERSION = 1
 PROGRAMMER_MINOR_VERSION = 0
 
+BYPASS_FIRMWARE_UPDATE = False
 FIRMWARE_UPDATED = False
 
 def download_microSWIFT_firmware():
@@ -560,7 +561,9 @@ class Ui_MainWindow(object):
           "\r\r\nPlease ensure you are running the most recent version of this tool."
           "\r\nVisit https://github.com/SASlabgroup/microSWIFT-programmer"))
 
-        if FIRMWARE_UPDATED:
+        if BYPASS_FIRMWARE_UPDATE:
+            self.appendText("Firmware update bypassed.")
+        elif FIRMWARE_UPDATED:
             self.appendText("Firmware successfully updated from GitHub.")
         else:
             self.appendError("Unable to pull firmware from GitHub!")
@@ -988,10 +991,18 @@ if __name__ == "__main__":
     arguments = []
     if len(sys.argv) > 1:
         arguments = sys.argv[1:]
+        BYPASS_FIRMWARE_UPDATE = arguments[0] == "--no_firmware_update"
+
+    if len(arguments) > 0 and not BYPASS_FIRMWARE_UPDATE:
+        print("Unknown argument passed {arg}.".format(arg=arguments[0]))
+        sys.exit(1)
+
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
-    if not arguments[0] == "--no_firmware_update":
+
+    if not BYPASS_FIRMWARE_UPDATE:
         FIRMWARE_UPDATED = download_microSWIFT_firmware()
+
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
     MainWindow.show()
