@@ -515,6 +515,8 @@ class Ui_MainWindow(object):
         self.find_usb_port()
         self.displayPicture()
 
+        self.lightGainComboBox.setCurrentIndex(2)
+
         self.statusTextEdit.setFont(QFont("Courier New"))
 
         (self.writeText
@@ -618,7 +620,7 @@ class Ui_MainWindow(object):
             date += "\x00"  # null terminated
             time += "\x00"  # null terminated
 
-            configStruct = struct.pack("<LLLLLLLLLL??????B11s9s",
+            configStruct = struct.pack("<LLLLLLLLL??????11s9s",
                                        int(self.trackingNumberSpinBox.value()),
                                        int(self.gnssNumSamplesSpinBox.value()),
                                        int(self.dutyCycleSpinBox.value()),
@@ -928,9 +930,7 @@ class Ui_MainWindow(object):
 
     def disableGUI(self):
         self.ctEnableButton.setDisabled(True)
-        self.ctNumSamplesSpinBox.setDisabled(True)
         self.tempEnableButton.setDisabled(True)
-        self.tempNumSamplesSpinBox.setDisabled(True)
         self.lightEnableButton.setDisabled(True)
         self.lightMatchGNSSCheckbox.setDisabled(True)
         self.lightNumSamplesSpinBox.setDisabled(True)
