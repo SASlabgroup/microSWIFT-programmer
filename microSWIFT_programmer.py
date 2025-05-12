@@ -9,8 +9,8 @@ import re
 import subprocess
 
 from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtGui import QTextCharFormat, QColor, QGuiApplication, QFont, QFontDatabase
-from PyQt6.QtWidgets import QGraphicsScene, QGraphicsPixmapItem
+from PyQt6.QtGui import QTextCharFormat, QColor, QGuiApplication, QFont, QFontDatabase, QPalette, QTextCursor
+from PyQt6.QtWidgets import QGraphicsScene, QGraphicsPixmapItem, QTextEdit
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import pyqtSignal, QThread, Qt
 
@@ -149,7 +149,6 @@ class Ui_MainWindow(object):
     device_connected = False
     stlink_port = ""
     configFilePath = "firmware/config.bin"
-    colorScheme = []
 
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
@@ -502,6 +501,33 @@ class Ui_MainWindow(object):
         self.turbidityEnableButton.setText(_translate("MainWindow", "Enable Turbidity"))
         self.turbidityMatchGNSSCheckbox.setText(_translate("MainWindow", "Match GNSS period"))
         self.turbidityNumSamplesLabel.setText(_translate("MainWindow", "Number of samples @ 1Hz"))
+
+    def adjust_font_color_based_on_background(self, text_edit: QTextEdit):
+        """Adjusts font color in a QTextEdit based on background color."""
+        # Get the background color from the QTextEdit's palette
+        bg_color = text_edit.palette().color(text_edit.viewport().backgroundRole())
+
+        # Determine if the background is "close enough" to black or white
+        is_black = bg_color.red() < 10 and bg_color.green() < 10 and bg_color.blue() < 10
+        is_white = bg_color.red() > 245 and bg_color.green() > 245 and bg_color.blue() > 245
+
+        # Decide font color
+        if is_black:
+            font_color = QColor(Qt.GlobalColor.white)
+        elif is_white:
+            font_color = QColor(Qt.GlobalColor.black)
+        else:
+            # For non-pure black/white backgrounds, you could calculate contrast or set a default
+            # Here we default to black for safety
+            font_color = QColor(Qt.GlobalColor.black)
+
+        # Apply the font color to the entire document
+        cursor = text_edit.textCursor()
+        cursor.select(QTextCursor.SelectionType.Document)
+        format = QTextCharFormat()
+        format.setForeground(font_color)
+        cursor.mergeCharFormat(format)
+        text_edit.mergeCurrentCharFormat(format)
 
     def finishSetup(self):
         # Added functionality
@@ -881,27 +907,12 @@ class Ui_MainWindow(object):
 
     def writeText(self, err_str):
         self.statusTextEdit.clear()
-
-        char_format = QTextCharFormat()
-
-        if self.colorScheme == Qt.ColorScheme.Dark:
-            char_format.setForeground(QColor('white'))
-        else:
-            char_format.setForeground(QColor('black'))
-
-        self.statusTextEdit.setCurrentCharFormat(char_format)
+        self.adjust_font_color_based_on_background(self.statusTextEdit)
 
         self.statusTextEdit.setText(err_str)
 
     def appendText(self, string):
-        char_format = QTextCharFormat()
-
-        if self.colorScheme == Qt.ColorScheme.Dark:
-            char_format.setForeground(QColor('white'))
-        else:
-            char_format.setForeground(QColor('black'))
-
-        self.statusTextEdit.setCurrentCharFormat(char_format)
+        self.adjust_font_color_based_on_background(self.statusTextEdit)
 
         self.statusTextEdit.append(string)
 
