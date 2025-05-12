@@ -3,14 +3,15 @@
 Installation and Usage:
 
 1) [Install Python](https://www.python.org/downloads/)
-2) In a terminal, install Python dependencies
+2) [Install STM32CubeIDE (Create an account if needed)](https://www.st.com/en/development-tools/stm32cubeprog.html)
+3) In a terminal, install Python dependencies
 ```shell
 python -m pip install --upgrade pip
 python -m pip install PyQt6, PySerial, requests
 ```
-3) Clone or download this repo to a location of your choice
-4) Open a terminal and navigate to where you cloned/downloaded this repo
-5) Run the program
+4) Clone or download this repo to a location of your choice
+5) Open a terminal and navigate to where you cloned/downloaded this repo
+6) Run the program
 ```shell
 python microSWIFT_programmer.py
 ```
