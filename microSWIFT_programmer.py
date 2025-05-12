@@ -804,7 +804,7 @@ class Ui_MainWindow(object):
 
         for port in ports:
             # Check if the port is an STLINK
-            if "STLINK" in port.description:
+            if "STLINK" in port.description.upper():
                 stlink_ports.append(port.device)
                 break
 
