@@ -507,9 +507,13 @@ class Ui_MainWindow(object):
         # Get the background color from the QTextEdit's palette
         bg_color = text_edit.palette().color(text_edit.viewport().backgroundRole())
 
+        red = bg_color.red()
+        green = bg_color.green()
+        blue = bg_color.blue()
+
         # Determine if the background is "close enough" to black or white
-        is_black = bg_color.red() < 10 and bg_color.green() < 10 and bg_color.blue() < 10
-        is_white = bg_color.red() > 245 and bg_color.green() > 245 and bg_color.blue() > 245
+        is_black = bg_color.red() < 50 and bg_color.green() < 50 and bg_color.blue() < 50
+        is_white = bg_color.red() > 200 and bg_color.green() > 200 and bg_color.blue() > 200
 
         # Decide font color
         if is_black:
