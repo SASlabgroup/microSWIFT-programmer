@@ -3,7 +3,7 @@
 Installation and Usage:
 
 1) [Install Python](https://www.python.org/downloads/)
-2) [Install STM32CubeIDE (Create an account if needed)](https://www.st.com/en/development-tools/stm32cubeprog.html)
+2) [Install STM32CubeProgrammer (Create an account if needed)](https://www.st.com/en/development-tools/stm32cubeprog.html)
 3) In a terminal, install Python dependencies
 ```shell
 python -m pip install --upgrade pip
@@ -26,3 +26,5 @@ To bypass the firmware update functionality, pass the flag "--no_firmware_update
 ```shell
 python microSWIFT_programmer.py --no_firmware_update
 ```
+
+When downloading a configuration file, there is no assigned default file extension. If the configuration is to be used to conduct an over-the-air configuration update, save the file with an extension of ".sbd" and ensure the full file length does not exceed 80 characters, including the file extension (ex. "microSWIFT_100_config.sbd").

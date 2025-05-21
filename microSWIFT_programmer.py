@@ -994,6 +994,7 @@ class ProgrammerApp(QMainWindow):
         self.trackingNumberSpinBox.setDisabled(True)
         self.verifyButton.setDisabled(True)
         self.programButton.setDisabled(True)
+        self.downloadConfigFile.setDisabled(True)
 
     def reenableGUI(self):
         self.ctEnableButton.setEnabled(True)
@@ -1020,6 +1021,7 @@ class ProgrammerApp(QMainWindow):
         self.trackingNumberSpinBox.setEnabled(True)
         self.verifyButton.setEnabled(True)
         self.programButton.setEnabled(True)
+        self.downloadConfigFile.setEnabled(True)
 
     def displayPicture(self):
 
