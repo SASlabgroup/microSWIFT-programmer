@@ -9,18 +9,15 @@ import re
 import subprocess
 
 from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtGui import QTextCharFormat, QColor, QGuiApplication, QFont, QFontDatabase, QPalette, QTextCursor
-from PyQt6.QtWidgets import QGraphicsScene, QGraphicsPixmapItem, QTextEdit
+from PyQt6.QtGui import QTextCharFormat, QColor, QGuiApplication, QFont, QTextCursor
+from PyQt6.QtWidgets import QGraphicsScene, QGraphicsPixmapItem, QTextEdit, QFileDialog, QMainWindow
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import pyqtSignal, QThread, Qt
 
 from datetime import datetime
 
 PROGRAMMER_MAJOR_VERSION = 1
-PROGRAMMER_MINOR_VERSION = 0
-
-BYPASS_FIRMWARE_UPDATE = False
-FIRMWARE_UPDATED = False
+PROGRAMMER_MINOR_VERSION = 1
 
 def download_microSWIFT_firmware():
     # Raw file URL on GitHub
@@ -145,15 +142,21 @@ class Worker(QThread):
                 self.finished.emit()
 
 
-class Ui_MainWindow(object):
+class ProgrammerApp(QMainWindow):
     device_connected = False
     stlink_port = ""
     configFilePath = "firmware/config.bin"
 
-    def setupUi(self, MainWindow):
-        MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(640, 800)
-        self.centralwidget = QtWidgets.QWidget(parent=MainWindow)
+    def __init__(self, bypasss_firmware_update, firmware_updated):
+        super().__init__()
+        self.bypass_firmware_update = bypasss_firmware_update
+        self.firmware_updated = firmware_updated
+        self.setupUi()
+
+    def setupUi(self):
+        self.setObjectName("MainWindow")
+        self.resize(640, 800)
+        self.centralwidget = QtWidgets.QWidget()
         self.centralwidget.setObjectName("centralwidget")
         self.ctFrame = QtWidgets.QFrame(parent=self.centralwidget)
         self.ctFrame.setGeometry(QtCore.QRect(10, 10, 301, 81))
@@ -327,12 +330,12 @@ class Ui_MainWindow(object):
         self.gnssSampleRateHorizLayout.addWidget(self.gnssSampleRateLabel)
         self.gnssVertLayout.addLayout(self.gnssSampleRateHorizLayout)
         self.timingFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.timingFrame.setGeometry(QtCore.QRect(330, 250, 291, 161))
+        self.timingFrame.setGeometry(QtCore.QRect(330, 250, 291, 111))
         self.timingFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.timingFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.timingFrame.setObjectName("timingFrame")
         self.verticalLayoutWidget = QtWidgets.QWidget(parent=self.timingFrame)
-        self.verticalLayoutWidget.setGeometry(QtCore.QRect(10, 10, 271, 141))
+        self.verticalLayoutWidget.setGeometry(QtCore.QRect(10, 10, 271, 91))
         self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
         self.timingVertLayout = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
         self.timingVertLayout.setContentsMargins(0, 0, 0, 0)
@@ -394,12 +397,12 @@ class Ui_MainWindow(object):
         self.graphicsView.setGeometry(QtCore.QRect(320, 10, 311, 231))
         self.graphicsView.setObjectName("graphicsView")
         self.statusAndProgFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.statusAndProgFrame.setGeometry(QtCore.QRect(340, 420, 271, 141))
+        self.statusAndProgFrame.setGeometry(QtCore.QRect(340, 370, 271, 191))
         self.statusAndProgFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.statusAndProgFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.statusAndProgFrame.setObjectName("statusAndProgFrame")
         self.layoutWidget3 = QtWidgets.QWidget(parent=self.statusAndProgFrame)
-        self.layoutWidget3.setGeometry(QtCore.QRect(10, 10, 251, 121))
+        self.layoutWidget3.setGeometry(QtCore.QRect(10, 10, 251, 171))
         self.layoutWidget3.setObjectName("layoutWidget3")
         self.statusAndProgVertLayout = QtWidgets.QVBoxLayout(self.layoutWidget3)
         self.statusAndProgVertLayout.setContentsMargins(0, 0, 0, 0)
@@ -420,6 +423,9 @@ class Ui_MainWindow(object):
         self.programButton.setFont(font)
         self.programButton.setObjectName("programButton")
         self.statusAndProgVertLayout.addWidget(self.programButton)
+        self.downloadConfigFile = QtWidgets.QPushButton(parent=self.layoutWidget3)
+        self.downloadConfigFile.setObjectName("downloadConfigFile")
+        self.statusAndProgVertLayout.addWidget(self.downloadConfigFile)
         self.turbidityFrame = QtWidgets.QFrame(parent=self.centralwidget)
         self.turbidityFrame.setGeometry(QtCore.QRect(10, 240, 301, 111))
         self.turbidityFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
@@ -469,10 +475,10 @@ class Ui_MainWindow(object):
         self.statusTextEdit = QtWidgets.QTextEdit(parent=self.centralwidget)
         self.statusTextEdit.setGeometry(QtCore.QRect(10, 570, 621, 221))
         self.statusTextEdit.setObjectName("statusTextEdit")
-        MainWindow.setCentralWidget(self.centralwidget)
+        self.setCentralWidget(self.centralwidget)
 
-        self.retranslateUi(MainWindow)
-        QtCore.QMetaObject.connectSlotsByName(MainWindow)
+        self.retranslateUi(self)
+        QtCore.QMetaObject.connectSlotsByName(self)
 
         self.finishSetup()
 
@@ -498,6 +504,7 @@ class Ui_MainWindow(object):
         self.devicePortLabel.setText(_translate("MainWindow", "No Device Connected"))
         self.verifyButton.setText(_translate("MainWindow", "Verify"))
         self.programButton.setText(_translate("MainWindow", "Program"))
+        self.downloadConfigFile.setText(_translate("MainWindow", "Download Config"))
         self.turbidityEnableButton.setText(_translate("MainWindow", "Enable Turbidity"))
         self.turbidityMatchGNSSCheckbox.setText(_translate("MainWindow", "Match GNSS period"))
         self.turbidityNumSamplesLabel.setText(_translate("MainWindow", "Number of samples @ 1Hz"))
@@ -594,85 +601,104 @@ class Ui_MainWindow(object):
           "\r\r\nPlease ensure you are running the most recent version of this tool."
           "\r\nVisit https://github.com/SASlabgroup/microSWIFT-programmer"))
 
-        if BYPASS_FIRMWARE_UPDATE:
+        if self.bypass_firmware_update:
             self.appendText("Firmware update bypassed.")
-        elif FIRMWARE_UPDATED:
+        elif self.firmware_updated:
             self.appendText("Firmware successfully updated from GitHub.")
         else:
             self.appendError("Unable to pull firmware from GitHub!")
 
-    def assembleBinaryConfigFile(self):
+    def saveConfigAsFile(self):
+        file_dialog = QFileDialog(self)
+        file_dialog.setWindowTitle("Save File")
+        file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        file_dialog.setViewMode(QFileDialog.ViewMode.Detail)
+
+        if file_dialog.exec():
+            selected_file = file_dialog.selectedFiles()[0]
+
+            with open(selected_file, "wb") as config_file:
+                config_file.write(self.assembleBinaryConfigStruct())
+                self.writeText("Saved configuration file {file}".format(file=selected_file))
+
+
+    def assembleBinaryConfigStruct(self):
         get_int_from_str = lambda s: int(re.search(r'\d+', s).group()) if re.search(r'\d+', s) else None
+        '''
 
+                    Definition of configuration struct from configuration.h in firmware files
+
+                    typedef struct __attribute__((packed)) microSWIFT_configuration
+                    {
+                      uint32_t tracking_number;
+                      uint32_t gnss_samples_per_window;
+                      uint32_t duty_cycle;
+                      uint32_t iridium_max_transmit_time;
+                      uint32_t gnss_max_acquisition_wait_time;
+                      uint32_t gnss_sampling_rate;
+                      uint32_t total_light_samples;
+                      uint32_t light_sensor_gain;
+                      uint32_t total_turbidity_samples;
+
+                      bool iridium_v3f;
+                      bool gnss_high_performance_mode;
+                      bool ct_enabled;
+                      bool temperature_enabled;
+                      bool light_enabled;
+                      bool turbidity_enabled;
+
+                      const char compile_date_flash[11];
+                      const char compile_time_flash[9];
+                    } microSWIFT_configuration;
+
+                    In microSWIFT.ld:
+
+                      /* Custom variables (firmware version, compile date/time, etc) */
+                      .uservars :
+                      {
+                        /* Variables contained in type microSWIFT_configuration contained in configuration.h */
+                        KEEP(*(.uservars.CONFIGURATION))
+                        *(.uservars*);
+                      } > USERVARS
+                    '''
+
+        current_datetime = datetime.now()
+
+        # Format the date and time strings
+        date = current_datetime.strftime("%m/%d/%Y")  # MM/DD/YYYY
+        time = current_datetime.strftime("%H:%M:%S")  # HH:MM:SS
+        date += "\x00"  # null terminated
+        time += "\x00"  # null terminated
+
+        v3f = self.iridiumTypeComboBox.currentText() == "V3F"
+
+        configStruct = struct.pack("<LLLLLLLLL??????11s9s",
+                                   int(self.trackingNumberSpinBox.value()),
+                                   int(self.gnssNumSamplesSpinBox.value()),
+                                   int(self.dutyCycleSpinBox.value()),
+                                   int(self.iridiumTxTimeSpinBox.value()),
+                                   int(self.gnssMaxAcquisitionTimeSpinBox.value()),
+                                   get_int_from_str(self.gnssSampleRateComboBox.currentText()),
+                                   int(self.lightNumSamplesSpinBox.value()),
+                                   int(self.lightGainComboBox.currentIndex()),
+                                   int(self.turbidityNumSamplesSpinBox.value()),
+                                   bool(self.iridiumTypeComboBox.currentText() == "V3F"),
+                                   bool(self.gnssHighPerformanceModeCheckBox.isChecked()),
+                                   bool(self.ctEnableButton.isChecked()),
+                                   bool(self.tempEnableButton.isChecked()),
+                                   bool(self.lightEnableButton.isChecked()),
+                                   bool(self.turbidityEnableButton.isChecked()),
+                                   bytes(date.encode("utf-8")),
+                                   bytes(time.encode("utf-8"))
+                                   )
+
+        num_bytes = len(configStruct)
+
+        return configStruct
+    def assembleBinaryConfigFile(self):
         with open(self.configFilePath, "wb") as configFile:
-            '''
 
-            Definition of configuration struct from configuration.h in firmware files
-
-            typedef struct __attribute__((packed)) microSWIFT_configuration
-            {
-              uint32_t tracking_number;
-              uint32_t gnss_samples_per_window;
-              uint32_t duty_cycle;
-              uint32_t iridium_max_transmit_time;
-              uint32_t gnss_max_acquisition_wait_time;
-              uint32_t gnss_sampling_rate;
-              uint32_t total_light_samples;
-              uint32_t light_sensor_gain;
-              uint32_t total_turbidity_samples;
-
-              bool iridium_v3f;
-              bool gnss_high_performance_mode;
-              bool ct_enabled;
-              bool temperature_enabled;
-              bool light_enabled;
-              bool turbidity_enabled;
-
-              const char compile_date_flash[11];
-              const char compile_time_flash[9];
-            } microSWIFT_configuration;
-
-            In microSWIFT.ld:
-
-              /* Custom variables (firmware version, compile date/time, etc) */
-              .uservars :
-              {
-                /* Variables contained in type microSWIFT_configuration contained in configuration.h */
-                KEEP(*(.uservars.CONFIGURATION))
-                *(.uservars*);
-              } > USERVARS
-            '''
-
-            current_datetime = datetime.now()
-
-            # Format the date and time strings
-            date = current_datetime.strftime("%m/%d/%Y")  # MM/DD/YYYY
-            time = current_datetime.strftime("%H:%M:%S")  # HH:MM:SS
-            date += "\x00"  # null terminated
-            time += "\x00"  # null terminated
-
-            configStruct = struct.pack("<LLLLLLLLL??????11s9s",
-                                       int(self.trackingNumberSpinBox.value()),
-                                       int(self.gnssNumSamplesSpinBox.value()),
-                                       int(self.dutyCycleSpinBox.value()),
-                                       int(self.iridiumTxTimeSpinBox.value()),
-                                       int(self.gnssMaxAcquisitionTimeSpinBox.value()),
-                                       get_int_from_str(self.gnssSampleRateComboBox.currentText()),
-                                       int(self.lightNumSamplesSpinBox.value()),
-                                       int(self.lightGainComboBox.currentIndex()),
-                                       int(self.turbidityNumSamplesSpinBox.value()),
-                                       bool(self.iridiumTypeComboBox.currentText() == "V3F"),
-                                       bool(self.gnssHighPerformanceModeCheckBox.isChecked()),
-                                       bool(self.ctEnableButton.isChecked()),
-                                       bool(self.tempEnableButton.isChecked()),
-                                       bool(self.lightEnableButton.isChecked()),
-                                       bool(self.turbidityEnableButton.isChecked()),
-                                       bytes(date.encode("utf-8")),
-                                       bytes(time.encode("utf-8"))
-                                       )
-
-            num_bytes = len(configStruct)
-            configFile.write(configStruct)
+            configFile.write(self.assembleBinaryConfigStruct())
 
     def fillComboBoxes(self):
         # Iridium type drop box
@@ -703,6 +729,7 @@ class Ui_MainWindow(object):
         self.turbidityNumSamplesSpinBox.setDisabled(True)
 
         self.programButton.setDisabled(True)
+        self.downloadConfigFile.setDisabled(True)
 
     def connectUIElements(self):
         self.worker.stdoutAvailable.connect(self.appendText)
@@ -720,6 +747,7 @@ class Ui_MainWindow(object):
 
         self.verifyButton.clicked.connect(self.verifySettings)
         self.programButton.clicked.connect(self.programDevice)
+        self.downloadConfigFile.clicked.connect(self.saveConfigAsFile)
 
         self.lightNumSamplesSpinBox.valueChanged.connect(self.resetVerifyButton)
         self.lightGainComboBox.currentIndexChanged.connect(self.resetVerifyButton)
@@ -867,6 +895,7 @@ class Ui_MainWindow(object):
 
         if settings_invalid:
             self.programButton.setDisabled(True)
+            self.downloadConfigFile.setDisabled(True)
             self.verifyButton.setStyleSheet("""
                 background-color: red;
                 color: white;
@@ -879,6 +908,7 @@ class Ui_MainWindow(object):
             self.writeError(write_string)
         else:
             self.programButton.setEnabled(True)
+            self.downloadConfigFile.setEnabled(True)
             self.verifyButton.setStyleSheet("""
                 background-color: green;
                 color: white;
@@ -891,6 +921,7 @@ class Ui_MainWindow(object):
         self.colorScheme = QGuiApplication.styleHints().colorScheme()
 
         self.programButton.setDisabled(True)
+        self.downloadConfigFile.setDisabled(True)
         self.verifyButton.setStyleSheet("""
                 background-color: gray;
                 color: white;
@@ -1002,25 +1033,29 @@ class Ui_MainWindow(object):
         self.thread.wait()
         os.remove(self.configFilePath)
 
-
-if __name__ == "__main__":
+def main():
     arguments = []
+    bypass_firmware_update = False
+    firmware_updated = False
+
     if len(sys.argv) > 1:
         arguments = sys.argv[1:]
-        BYPASS_FIRMWARE_UPDATE = arguments[0] == "--no_firmware_update"
+        bypass_firmware_update = arguments[0] == "--no_firmware_update"
 
-    if len(arguments) > 0 and not BYPASS_FIRMWARE_UPDATE:
+    if len(arguments) > 0 and not bypass_firmware_update:
         print("Unknown argument passed {arg}.".format(arg=arguments[0]))
         sys.exit(1)
 
     app = QtWidgets.QApplication(sys.argv)
-    MainWindow = QtWidgets.QMainWindow()
 
-    if not BYPASS_FIRMWARE_UPDATE:
-        FIRMWARE_UPDATED = download_microSWIFT_firmware()
+    if not bypass_firmware_update:
+        firmware_updated = download_microSWIFT_firmware()
 
-    ui = Ui_MainWindow()
-    ui.setupUi(MainWindow)
-    MainWindow.show()
+    programmer = ProgrammerApp(bypass_firmware_update, firmware_updated)
+    programmer.show()
     sys.exit(app.exec())
+
+if __name__ == "__main__":
+    main()
+
 

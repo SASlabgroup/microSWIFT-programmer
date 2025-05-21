@@ -373,7 +373,7 @@
       <x>330</x>
       <y>250</y>
       <width>291</width>
-      <height>161</height>
+      <height>111</height>
      </rect>
     </property>
     <property name="frameShape">
@@ -388,7 +388,7 @@
        <x>10</x>
        <y>10</y>
        <width>271</width>
-       <height>141</height>
+       <height>91</height>
       </rect>
      </property>
      <layout class="QVBoxLayout" name="timingVertLayout">
@@ -508,9 +508,9 @@
     <property name="geometry">
      <rect>
       <x>340</x>
-      <y>420</y>
+      <y>370</y>
       <width>271</width>
-      <height>141</height>
+      <height>191</height>
      </rect>
     </property>
     <property name="frameShape">
@@ -525,7 +525,7 @@
        <x>10</x>
        <y>10</y>
        <width>251</width>
-       <height>121</height>
+       <height>171</height>
       </rect>
      </property>
      <layout class="QVBoxLayout" name="statusAndProgVertLayout">
@@ -560,6 +560,13 @@
         </property>
         <property name="text">
          <string>Program</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="downloadConfigFile">
+        <property name="text">
+         <string>Download Config</string>
         </property>
        </widget>
       </item>
