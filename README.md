@@ -3,7 +3,7 @@
 Installation and Usage:
 
 1) [Install Python](https://www.python.org/downloads/)
-2) [Install STM32CubeIDE (Create an account if needed)](https://www.st.com/en/development-tools/stm32cubeprog.html)
+2) [Install STM32CubeProgrammer (Create an account if needed)](https://www.st.com/en/development-tools/stm32cubeprog.html)
 3) In a terminal, install Python dependencies
 ```shell
 python -m pip install --upgrade pip
