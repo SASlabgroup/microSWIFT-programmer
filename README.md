@@ -26,3 +26,5 @@ To bypass the firmware update functionality, pass the flag "--no_firmware_update
 ```shell
 python microSWIFT_programmer.py --no_firmware_update
 ```
+
+When downloading a configuration file, no default file extension is applied. If holding for reference, save as ".bin" extansion. If using to conduct over-the-air configuration update, save as ".sbd" extension and ensure the file length with extension does not exceed 80 characters (ex: "microSWIFT_100_configuration.sbd").
