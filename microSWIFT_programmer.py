@@ -799,6 +799,8 @@ class ProgrammerApp(QMainWindow):
             self.lightNumSamplesSpinBox.setDisabled(True)
             self.lightNumSamplesSpinBox.setValue(int((self.gnssNumSamplesSpinBox.value() /
                                                       get_int_from_str(self.gnssSampleRateComboBox.currentText()) / 2)))
+        elif self.lightEnableButton.isChecked():
+            self.lightNumSamplesSpinBox.setEnabled(True)
 
         self.resetVerifyButton()
 
@@ -820,6 +822,8 @@ class ProgrammerApp(QMainWindow):
             self.turbidityNumSamplesSpinBox.setDisabled(True)
             self.turbidityNumSamplesSpinBox.setValue(int(self.gnssNumSamplesSpinBox.value() /
                                                          get_int_from_str(self.gnssSampleRateComboBox.currentText())))
+        elif self.turbidityEnableButton.isChecked():
+            self.turbidityNumSamplesSpinBox.setEnabled(True)
 
         self.resetVerifyButton()
 
