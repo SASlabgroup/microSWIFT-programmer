@@ -48,9 +48,13 @@ class Worker(QThread):
     finished = pyqtSignal()
     stdoutAvailable = pyqtSignal(str)
     stderrAvailable = pyqtSignal(str)
+    turbidityCalibration = False
 
     def __init__(self, parent=None):
         super().__init__(parent)
+
+    def setTurbidityCalibration(self, turbidityCal):
+        self.turbidityCalibration = turbidityCal
 
     def run(self):
         firmwareBurnSuccessful = False
@@ -146,6 +150,7 @@ class ProgrammerApp(QMainWindow):
     device_connected = False
     stlink_port = ""
     configFilePath = "firmware/config.bin"
+    turbidityCalChecked = False
 
     def __init__(self, bypasss_firmware_update, firmware_updated):
         super().__init__()
@@ -432,7 +437,7 @@ class ProgrammerApp(QMainWindow):
         self.turbidityFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.turbidityFrame.setObjectName("turbidityFrame")
         self.layoutWidget_2 = QtWidgets.QWidget(parent=self.turbidityFrame)
-        self.layoutWidget_2.setGeometry(QtCore.QRect(10, 11, 307, 94))
+        self.layoutWidget_2.setGeometry(QtCore.QRect(10, 11, 281, 94))
         self.layoutWidget_2.setObjectName("layoutWidget_2")
         self.turbidityVerticalLayout = QtWidgets.QVBoxLayout(self.layoutWidget_2)
         self.turbidityVerticalLayout.setContentsMargins(0, 0, 0, 0)
@@ -453,6 +458,9 @@ class ProgrammerApp(QMainWindow):
         self.turbidityMatchGNSSCheckbox.setObjectName("turbidityMatchGNSSCheckbox")
         self.turbidityEnableHorizLayout.addWidget(self.turbidityMatchGNSSCheckbox)
         self.turbidityVerticalLayout.addLayout(self.turbidityEnableHorizLayout)
+        self.turbidityCalibrateSensor = QtWidgets.QPushButton(parent=self.layoutWidget_2)
+        self.turbidityCalibrateSensor.setObjectName("turbidityCalibrateSensor")
+        self.turbidityVerticalLayout.addWidget(self.turbidityCalibrateSensor)
         self.turbiditySamplesHorizLayout = QtWidgets.QHBoxLayout()
         self.turbiditySamplesHorizLayout.setObjectName("turbiditySamplesHorizLayout")
         self.turbidityNumSamplesLabel = QtWidgets.QLabel(parent=self.layoutWidget_2)
@@ -507,6 +515,7 @@ class ProgrammerApp(QMainWindow):
         self.downloadConfigFile.setText(_translate("MainWindow", "Download Config"))
         self.turbidityEnableButton.setText(_translate("MainWindow", "Enable Turbidity"))
         self.turbidityMatchGNSSCheckbox.setText(_translate("MainWindow", "Match GNSS period"))
+        self.turbidityCalibrateSensor.setText(_translate("MainWindow", "Calibrate Sensor"))
         self.turbidityNumSamplesLabel.setText(_translate("MainWindow", "Number of samples @ 1Hz"))
 
     def adjust_font_color_based_on_background(self, text_edit: QTextEdit):
@@ -727,6 +736,7 @@ class ProgrammerApp(QMainWindow):
 
         self.turbidityNumSamplesLabel.setDisabled(True)
         self.turbidityNumSamplesSpinBox.setDisabled(True)
+        self.turbidityCalibrateSensor.setDisabled(True)
 
         self.programButton.setDisabled(True)
         self.downloadConfigFile.setDisabled(True)
@@ -744,6 +754,7 @@ class ProgrammerApp(QMainWindow):
         self.turbidityEnableButton.clicked.connect(self.onTurbidityEnabledClick)
         self.lightMatchGNSSCheckbox.clicked.connect(self.onLightMatchGnssClicked)
         self.turbidityMatchGNSSCheckbox.clicked.connect(self.onTurbidityMatchGnssClicked)
+        self.turbidityCalibrateSensor.clicked.connect(self.onTurbidityCalibrateSensorClicked)
 
         self.verifyButton.clicked.connect(self.verifySettings)
         self.programButton.clicked.connect(self.programDevice)
@@ -809,10 +820,12 @@ class ProgrammerApp(QMainWindow):
             self.turbidityNumSamplesLabel.setEnabled(True)
             self.turbidityNumSamplesSpinBox.setEnabled(True)
             self.turbidityMatchGNSSCheckbox.setEnabled(True)
+            self.turbidityCalibrateSensor.setEnabled(True)
         else:
             self.turbidityNumSamplesLabel.setDisabled(True)
             self.turbidityNumSamplesSpinBox.setDisabled(True)
             self.turbidityMatchGNSSCheckbox.setDisabled(True)
+            self.turbidityCalibrateSensor.setDisabled(True)
 
         self.resetVerifyButton()
 
@@ -826,6 +839,37 @@ class ProgrammerApp(QMainWindow):
             self.turbidityNumSamplesSpinBox.setEnabled(True)
 
         self.resetVerifyButton()
+
+    def onTurbidityCalibrateSensorClicked(self):
+        self.turbidityCalChecked = not self.turbidityCalChecked
+
+        if self.turbidityCalChecked:
+            self.disableGUI()
+            self.turbidityCalibrateSensor.setEnabled(True)
+            self.turbidityCalibrateSensor.setStyleSheet("""
+                            background-color: green;
+                            color: white;
+                            border-radius: 5px;
+                            font-size: 16px;
+                            """)
+            self.programButton.setEnabled(True)
+            self.verifyButton.setStyleSheet("""
+                            background-color: green;
+                            color: white;
+                            border-radius: 5px;
+                            font-size: 16px;
+                            """)
+            self.writeText("Click \"Program\" to flash device with OBS calibration firmware.")
+        else:
+            self.reenableGUI()
+            self.resetVerifyButton()
+            self.turbidityCalibrateSensor.setStyleSheet("""
+                                        background-color: gray;
+                                        color: white;
+                                        border-radius: 5px;
+                                        font-size: 14px;
+                                        """)
+            self.writeText("Configure as desired and press the Verify button when ready.")
 
     def find_usb_port(self):
 
@@ -971,11 +1015,15 @@ class ProgrammerApp(QMainWindow):
             self.writeError("STLink programmer not detected.")
             return
 
-        self.assembleBinaryConfigFile()
+        if not self.turbidityCalChecked:
+            self.assembleBinaryConfigFile()
 
         self.writeText("Running STM32 Programmer CLI, please wait.")
 
         self.disableGUI()
+
+        self.worker.setTurbidityCalibration(self.turbidityCalChecked)
+
         # Run the worker thread so the program will be non-blocking
         self.thread.start()
 
@@ -988,6 +1036,7 @@ class ProgrammerApp(QMainWindow):
         self.turbidityEnableButton.setDisabled(True)
         self.turbidityMatchGNSSCheckbox.setDisabled(True)
         self.turbidityNumSamplesSpinBox.setDisabled(True)
+        self.turbidityCalibrateSensor.setDisabled(True)
         self.iridiumTxTimeSpinBox.setDisabled(True)
         self.iridiumTypeComboBox.setDisabled(True)
         self.gnssNumSamplesSpinBox.setDisabled(True)
@@ -1014,6 +1063,7 @@ class ProgrammerApp(QMainWindow):
         if self.turbidityEnableButton.isChecked():
             self.turbidityMatchGNSSCheckbox.setEnabled(True)
             self.turbidityNumSamplesSpinBox.setEnabled(True)
+            self.turbidityCalibrateSensor.setEnabled(True)
 
         self.iridiumTxTimeSpinBox.setEnabled(True)
         self.iridiumTypeComboBox.setEnabled(True)

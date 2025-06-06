@@ -593,7 +593,7 @@
       <rect>
        <x>10</x>
        <y>11</y>
-       <width>307</width>
+       <width>281</width>
        <height>94</height>
       </rect>
      </property>
@@ -628,6 +628,13 @@
          </widget>
         </item>
        </layout>
+      </item>
+      <item>
+       <widget class="QPushButton" name="turbidityCalibrateSensor">
+        <property name="text">
+         <string>Calibrate Sensor</string>
+        </property>
+       </widget>
       </item>
       <item>
        <layout class="QHBoxLayout" name="turbiditySamplesHorizLayout">
