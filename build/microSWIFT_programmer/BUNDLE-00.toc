@@ -1,0 +1,3 @@
+([('microSWIFT_programmer',
+   '/Users/philbush/STM32CubeIDE/microSWIFT/microSWIFT-programmer/dist/microSWIFT_programmer',
+   'EXECUTABLE')],)

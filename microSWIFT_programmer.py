@@ -4,6 +4,7 @@ import struct
 import sys
 import os
 import requests
+import serial
 import serial.tools.list_ports
 import re
 import subprocess
@@ -17,7 +18,7 @@ from PyQt6.QtCore import pyqtSignal, QThread, Qt
 from datetime import datetime
 
 PROGRAMMER_MAJOR_VERSION = 1
-PROGRAMMER_MINOR_VERSION = 1
+PROGRAMMER_MINOR_VERSION = 2
 
 def download_microSWIFT_firmware():
     # Raw file URL on GitHub
@@ -144,6 +145,35 @@ class Worker(QThread):
                     self.finished.emit()
             else:
                 self.finished.emit()
+
+
+class SerialReaderThread(QThread):
+    data_received = pyqtSignal(str)
+
+    def __init__(self, port_name: str, baudrate: int = 115200, parent=None):
+        super().__init__(parent)
+        self.port_name = port_name
+        self.baudrate = baudrate
+        self.serial_port = None
+        self._running = True
+
+    def run(self):
+        try:
+            self.serial_port = serial.Serial(self.port_name, self.baudrate, timeout=1)
+            while self._running:
+                if self.serial_port.in_waiting:
+                    line = self.serial_port.readline().decode(errors='ignore').strip()
+                    self.data_received.emit(line)
+        except serial.SerialException as e:
+            print(f"Serial error: {e}")
+        finally:
+            if self.serial_port and self.serial_port.is_open:
+                self.serial_port.close()
+
+    def stop(self):
+        self._running = False
+        self.wait()
+
 
 
 class ProgrammerApp(QMainWindow):
