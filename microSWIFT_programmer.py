@@ -17,7 +17,7 @@ from PyQt6.QtCore import pyqtSignal, QThread, Qt
 from datetime import datetime
 
 PROGRAMMER_MAJOR_VERSION = 1
-PROGRAMMER_MINOR_VERSION = 1
+PROGRAMMER_MINOR_VERSION = 2
 
 def download_microSWIFT_firmware():
     # Raw file URL on GitHub
