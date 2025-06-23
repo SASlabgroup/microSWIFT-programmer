@@ -2,9 +2,11 @@ import statistics
 import sys
 import random
 import time
-import board
-import busio
+# import board
+# import busio
 import adafruit_vcnl4010
+
+import numpy as np
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import QSize, QRect, Qt, pyqtSignal, QThread
@@ -12,25 +14,49 @@ from PyQt6.QtGui import QPalette, QColor, QFont, QAction
 from PyQt6.QtWidgets import QMainWindow, QDialog, QVBoxLayout, QLabel, QApplication, QPushButton, QStyleFactory, \
     QWidget, QFrame, QSizePolicy, QDoubleSpinBox, QTextEdit, QAbstractSpinBox, QLineEdit, QMenuBar, QMenu, QStatusBar
 
-PROGRAMMER_MAJOR_VERSION = 1
-PROGRAMMER_MINOR_VERSION = 2
-NUMBER_OF_SAMPLES = 30
-
+CALIBRATOR_MAJOR_VERSION = 1
+CALIBRATOR_MINOR_VERSION = 0
+NUMBER_OF_SAMPLES = 5
 
 class SensorThread(QThread):
-    data_collected = pyqtSignal(int)
+    proximity_read = pyqtSignal(int)
+    finished = pyqtSignal(float, float)
 
-    def run(self):
-        i2c = busio.I2C(board.SCL, board.SDA)
-        sensor = adafruit_vcnl4010.VCNL4010(i2c)
+    def __init__(self, parent=None):
+        super().__init__(parent)
 
+    def run(self) -> None:
+        # i2c = busio.I2C(board.SCL, board.SDA)
+        # sensor = adafruit_vcnl4010.VCNL4010(i2c)
+        i = 0
         samples = []
-        for _ in range(30):
-            proximity = sensor.proximity
-            samples.append(proximity)
-            time.sleep(1)
+        self._running = True
 
-        self.data_collected.emit(samples)
+        while self._running:
+            # Read the sensor
+            # proximity = sensor.proximity
+            proximity = 32768 + random.randint(-50, 50) # Testing code
+            samples.append(proximity)
+            self.proximity_read.emit(proximity)
+            i += 1
+
+            if i < NUMBER_OF_SAMPLES:
+                time.sleep(0.999)
+            else:
+                break
+
+
+        if (self._running):
+            mean = statistics.mean(samples)
+            stdev = statistics.stdev(samples)
+
+            self.finished.emit(mean, stdev)
+
+    def stop(self) -> None:
+        self._running = False
+
+
+
 
 class HelpPopUpWindow(QDialog):
 
@@ -69,12 +95,12 @@ to produce a polynomial best-fit line equation."""))
 
 
 class OBSCalibratorApp(QMainWindow):
+    ongoingSampling = 0
+
     ntu100Complete = False
     ntu250Complete = False
     ntu500Complete = False
     ntu1000Complete = False
-
-    stopSampling = False
 
     def __init__(self):
         super().__init__()
@@ -290,10 +316,11 @@ class OBSCalibratorApp(QMainWindow):
         font2.setFamilies([u"PT Mono"])
         font2.setPointSize(11)
         self.findEquationButton.setFont(font2)
-        self.equationLineEdit = QLineEdit(self.centralwidget)
+        self.equationLineEdit = QTextEdit(self.centralwidget)
         self.equationLineEdit.setObjectName(u"equationLineEdit")
         self.equationLineEdit.setGeometry(QRect(115, 650, 356, 31))
-        self.equationLineEdit.setFont(font1)
+        font2.setPointSize(12)
+        self.equationLineEdit.setFont(font2)
         self.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(self)
         self.menubar.setObjectName(u"menubar")
@@ -323,24 +350,28 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu100AverageLabel.setText(_translate("MainWindow", "Average"))
         self.ntu100TextEdit.setPlaceholderText(_translate("MainWindow",
                                                           "1                      2                      3                      4                      5                      6                      7                      8                      9                      10                      11                      12                      13                      14                      15                      16                      17                      18                      19                      20                      21                      22                      23                      24                      25                      26                      27                      28                      29                      30                     "))
+        self.ntu100StdevLabel.setText(_translate("MainWindow", "Std Dev"))
         self.ntu250TextEdit.setPlaceholderText(_translate("MainWindow",
                                                           "1                      2                      3                      4                      5                      6                      7                      8                      9                      10                      11                      12                      13                      14                      15                      16                      17                      18                      19                      20                      21                      22                      23                      24                      25                      26                      27                      28                      29                      30                     "))
         self.ntu250AverageLabel.setText(_translate("MainWindow", "Average"))
         self.ntu250ResetButton.setText(_translate("MainWindow", "Reset"))
         self.ntu250StartButton.setText(_translate("MainWindow", "Start"))
         self.ntu250Label.setText(_translate("MainWindow", "250 NTU"))
+        self.ntu250StdevLabel.setText(_translate("MainWindow", "Std Dev"))
         self.ntu500Label.setText(_translate("MainWindow", "500 NTU"))
         self.ntu500StartButton.setText(_translate("MainWindow", "Start"))
         self.ntu500ResetButton.setText(_translate("MainWindow", "Reset"))
         self.ntu500AverageLabel.setText(_translate("MainWindow", "Average"))
         self.ntu500TextEdit.setPlaceholderText(_translate("MainWindow",
                                                           "1                      2                      3                      4                      5                      6                      7                      8                      9                      10                      11                      12                      13                      14                      15                      16                      17                      18                      19                      20                      21                      22                      23                      24                      25                      26                      27                      28                      29                      30                     "))
+        self.ntu500StdevLabel.setText(_translate("MainWindow", "Std Dev"))
         self.ntu1000Label.setText(_translate("MainWindow", "1000 NTU"))
         self.ntu1000StartButton.setText(_translate("MainWindow", "Start"))
         self.ntu1000ResetButton.setText(_translate("MainWindow", "Reset"))
         self.ntu1000AverageLabel.setText(_translate("MainWindow", "Average"))
         self.ntu1000TextEdit.setPlaceholderText(_translate("MainWindow",
                                                            "1                      2                      3                      4                      5                      6                      7                      8                      9                      10                      11                      12                      13                      14                      15                      16                      17                      18                      19                      20                      21                      22                      23                      24                      25                      26                      27                      28                      29                      30                     "))
+        self.ntu1000StdevLabel.setText(_translate("MainWindow", "Std Dev"))
         self.findEquationButton.setText(_translate("MainWindow", "Find Equation"))
         self.equationLineEdit.setText(_translate("MainWindow", "Best Fit Equation: "))
         self.menuMenu.setTitle(_translate("MainWindow", "Menu"))
@@ -348,11 +379,18 @@ class OBSCalibratorApp(QMainWindow):
         self.actionHow_To_UseThisTool.setText(_translate("MainWindow", "How To Use This Tool"))
 
     def finishSetup(self) -> None:
+        # Instantiate the Sensor Thread
+        self.sensorThread = SensorThread()
+
         # Disable the reset buttons
         self.ntu100ResetButton.setDisabled(True)
         self.ntu250ResetButton.setDisabled(True)
         self.ntu500ResetButton.setDisabled(True)
         self.ntu1000ResetButton.setDisabled(True)
+
+        # Disable Find Equation Button
+        self.findEquationButton.setDisabled(True)
+
         # Connect all the signals/slots
         self.connectUIElements()
 
@@ -375,13 +413,15 @@ class OBSCalibratorApp(QMainWindow):
         # On menu "How To Use This Tool" clicked
         self.actionHow_To_UseThisTool.triggered.connect(self.showHelp)
 
+        # A sample has been taken by the sampling thread
+        self.sensorThread.proximity_read.connect(self.displaySample)
+
+        # Sampling is complete
+        self.sensorThread.finished.connect(self.samplingComplete)
+
+        self.findEquationButton.clicked.connect(self.findEquation)
+
     def startButtonClicked(self, ntu: int) -> None:
-        self.stopSampling = False
-
-        averageSpinBox = None
-        stdevSpinBox = None
-        whichSampleToComplete = None
-
         self.ntu100StartButton.setDisabled(True)
         self.ntu250StartButton.setDisabled(True)
         self.ntu500StartButton.setDisabled(True)
@@ -391,52 +431,24 @@ class OBSCalibratorApp(QMainWindow):
             case 100:
                 self.ntu100ResetButton.setEnabled(True)
                 self.ntu100TextEdit.clear()
-                averageSpinBox = self.ntu100AverageSpinBox
-                stdevSpinBox = self.ntu100StdevSpinBox
-                whichSampleToComplete = self.ntu100Complete
+                self.ongoingSampling = 100
 
             case 250:
                 self.ntu250ResetButton.setEnabled(True)
                 self.ntu250TextEdit.clear()
-                averageSpinBox = self.ntu250AverageSpinBox
-                stdevSpinBox = self.ntu250StdevSpinBox
-                whichSampleToComplete = self.ntu250Complete
+                self.ongoingSampling = 250
 
             case 500:
                 self.ntu500ResetButton.setEnabled(True)
                 self.ntu500TextEdit.clear()
-                averageSpinBox = self.ntu500AverageSpinBox
-                stdevSpinBox = self.ntu500StdevSpinBox
-                whichSampleToComplete = self.ntu500Complete
+                self.ongoingSampling = 500
 
             case 1000:
                 self.ntu1000ResetButton.setEnabled(True)
                 self.ntu1000TextEdit.clear()
-                averageSpinBox = self.ntu1000AverageSpinBox
-                stdevSpinBox = self.ntu1000StdevSpinBox
-                whichSampleToComplete = self.ntu1000Complete
+                self.ongoingSampling = 1000
 
-            case _:
-                return
-
-        # Get the samples
-        samples = self.takeSamples(ntu)
-        mean = statistics.mean(samples)
-        stdDev = statistics.stdev(samples)
-
-        averageSpinBox.setValue(mean)
-        stdevSpinBox.setValue(stdDev)
-
-        if (stdDev == 0):
-            if (samples[0] == 0):
-                averageSpinBox.setStyleSheet("color:red;")
-                stdevSpinBox.setStyleSheet("color:red;")
-
-        # Check that the variance is within 10% of mean
-        elif (stdDev/mean >= 0.1):
-            stdevSpinBox.setStyleSheet("color:red;")
-        else:
-            whichSampleToComplete = True
+        self.sensorThread.start()
 
 
 
@@ -459,7 +471,12 @@ class OBSCalibratorApp(QMainWindow):
                 self.ntu1000StartButton.setEnabled(True)
                 self.ntu1000Complete = False
 
-        self.stopSampling = True
+        self.ongoingSampling = 0
+
+        self.sensorThread.stop()
+
+        self.checkforCompleteness()
+
 
     def resetApplication(self) -> None:
         self.setupUi()
@@ -469,38 +486,113 @@ class OBSCalibratorApp(QMainWindow):
         popup = HelpPopUpWindow()
         popup.exec()
 
-    def takeSamples(self, ntu) -> list[int]:
-        textEdit = None
-        sampleSeries = []
-
-        match ntu:
+    def displaySample(self, sample) -> None:
+        match self.ongoingSampling:
             case 100:
-                textEdit = self.ntu100TextEdit
+                self.ntu100TextEdit.append(str(sample))
+
             case 250:
-                textEdit = self.ntu250TextEdit
+                self.ntu250TextEdit.append(str(sample))
+
             case 500:
-                textEdit = self.ntu500TextEdit
+                self.ntu500TextEdit.append(str(sample))
+
             case 1000:
-                textEdit = self.ntu1000TextEdit
+                self.ntu1000TextEdit.append(str(sample))
 
+    def samplingComplete(self, mean, stdev) -> None:
+        checkStdev = lambda stdev, mean: (stdev / mean) < 0.01 if stdev != 0 else False
 
-        for i in range(NUMBER_OF_SAMPLES):
-            if self.stopSampling:
-                return sampleSeries
+        match self.ongoingSampling:
+            case 100:
+                self.ntu100AverageSpinBox.setValue(mean)
+                self.ntu100StdevSpinBox.setValue(stdev)
+                if checkStdev:
+                    self.ntu100Complete = True
 
-            sample = self.readSensor()
-            sampleSeries.append(sample)
-            sampleStr = str(sample)
-            textEdit.append(sampleStr)
+            case 250:
+                self.ntu250AverageSpinBox.setValue(mean)
+                self.ntu250StdevSpinBox.setValue(stdev)
+                if checkStdev:
+                    self.ntu250Complete = True
 
-        return sampleSeries
+            case 500:
+                self.ntu500AverageSpinBox.setValue(mean)
+                self.ntu500StdevSpinBox.setValue(stdev)
+                if checkStdev:
+                    self.ntu500Complete = True
 
-    def readSensor(self) -> int:
-        time.sleep(1)
-        # TODO: implement this
-        return random.randint(0, 65535)
+            case 1000:
+                self.ntu1000AverageSpinBox.setValue(mean)
+                self.ntu1000StdevSpinBox.setValue(stdev)
+                if checkStdev:
+                    self.ntu1000Complete = True
 
+        self.ongoingSampling = 0
 
+        self.checkforCompleteness()
+
+    def checkforCompleteness(self) -> None:
+        if (self.ntu1000Complete and self.ntu250Complete and self.ntu500Complete and self.ntu100Complete):
+            self.findEquationButton.setEnabled(True)
+        else:
+            self.findEquationButton.setDisabled(True)
+
+        if not self.ntu100Complete:
+            self.ntu100StartButton.setEnabled(True)
+
+        if not self.ntu250Complete:
+            self.ntu250StartButton.setEnabled(True)
+
+        if not self.ntu500Complete:
+            self.ntu500StartButton.setEnabled(True)
+
+        if not self.ntu1000Complete:
+            self.ntu1000StartButton.setEnabled(True)
+
+    def findEquation(self) -> None:
+        x_points = [100.0, 250.0, 500.0, 1000.0]
+        y_points = [self.ntu100AverageSpinBox.value(), self.ntu250AverageSpinBox.value(),
+                    self.ntu500AverageSpinBox.value(), self.ntu1000AverageSpinBox.value()]
+
+        # Fit a 3rd-degree polynomial
+        coeffs = np.polyfit(x_points, y_points, 3)
+
+        # Create a polynomial function from the coefficients
+        poly_func = np.poly1d(coeffs)
+
+        self.equationLineEdit.setText(self.format_polynomial_for_qtextedit(poly_func))
+
+    def format_polynomial_for_qtextedit(self, poly_func):
+        """
+        Formats a numpy.poly1d object into an HTML string for QTextEdit display.
+        """
+        terms = []
+        degree = poly_func.order
+        coeffs = poly_func.coefficients
+        for i, coeff in enumerate(coeffs):
+            power = degree - i
+            if abs(coeff) < 1e-6:
+                continue  # Skip near-zero coefficients
+
+            # Format coefficient
+            coeff_str = f"{coeff:.4f}"
+            if coeff > 0 and i != 0:
+                coeff_str = f"+ {coeff_str}"
+            elif coeff < 0:
+                coeff_str = f"- {abs(coeff):.4f}"
+
+            # Format term
+            if power == 0:
+                term = f"{coeff_str}"
+            elif power == 1:
+                term = f"{coeff_str}x"
+            else:
+                term = f"{coeff_str}x<sup>{power}</sup>"
+
+            terms.append(term)
+
+        return " ".join(terms)
 
 
 
