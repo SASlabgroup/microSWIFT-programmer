@@ -9,7 +9,7 @@ import numpy as np
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import QSize, QRect, Qt, pyqtSignal, QThread
-from PyQt6.QtGui import QFont, QAction
+from PyQt6.QtGui import QFont, QAction, QFontDatabase
 from PyQt6.QtWidgets import QMainWindow, QDialog, QVBoxLayout, QLabel, QApplication, QPushButton, QWidget, QFrame, \
     QSizePolicy, QDoubleSpinBox, QTextEdit, QAbstractSpinBox, QMenuBar, QMenu, QStatusBar
 
@@ -106,14 +106,17 @@ class OBSCalibratorApp(QMainWindow):
         self.finishSetup()
 
     def setupUi(self) -> None:
+        font_id = QFontDatabase.addApplicationFont("/Users/philbush/STM32CubeIDE/microSWIFT/microSWIFT-programmer/PT_Mono.ttf")
+        font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
+        custom_font11 = QFont(font_family, 11)
+        custom_font12 = QFont(font_family, 12)
+
         self.setObjectName(u"MainWindow")
         self.resize(475, 745)
         self.setMinimumSize(QSize(475, 745))
         self.setMaximumSize(QSize(475, 745))
-        font = QFont()
-        font.setFamilies([u"PT Mono"])
-        font.setPointSize(12)
-        self.setFont(font)
+
+        self.setFont(custom_font12)
         self.actionReset = QAction(self)
         self.actionReset.setObjectName(u"actionReset")
         self.actionHow_To_UseThisTool = QAction(self)
@@ -128,7 +131,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu100Label = QLabel(self.ntu100Frame)
         self.ntu100Label.setObjectName(u"ntu100Label")
         self.ntu100Label.setGeometry(QRect(0, 0, 111, 20))
-        self.ntu100Label.setFont(font)
+        self.ntu100Label.setFont(custom_font12)
         self.ntu100Label.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
         self.ntu100StartButton = QPushButton(self.ntu100Frame)
         self.ntu100StartButton.setObjectName(u"ntu100StartButton")
@@ -147,7 +150,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu100AverageLabel = QLabel(self.ntu100Frame)
         self.ntu100AverageLabel.setObjectName(u"ntu100AverageLabel")
         self.ntu100AverageLabel.setGeometry(QRect(0, 65, 111, 21))
-        self.ntu100AverageLabel.setFont(font)
+        self.ntu100AverageLabel.setFont(custom_font12)
         self.ntu100AverageLabel.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
         self.ntu100AverageSpinBox = QDoubleSpinBox(self.ntu100Frame)
         self.ntu100AverageSpinBox.setObjectName(u"ntu100AverageSpinBox")
@@ -168,7 +171,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu100StdevLabel = QLabel(self.ntu100Frame)
         self.ntu100StdevLabel.setObjectName(u"ntu100StdevLabel")
         self.ntu100StdevLabel.setGeometry(QRect(0, 100, 111, 21))
-        self.ntu100StdevLabel.setFont(font)
+        self.ntu100StdevLabel.setFont(custom_font12)
         self.ntu100StdevLabel.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
         self.ntu100StdevSpinBox = QDoubleSpinBox(self.ntu100Frame)
         self.ntu100StdevSpinBox.setObjectName(u"ntu100StdevSpinBox")
@@ -196,7 +199,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu250AverageLabel = QLabel(self.ntu250Frame)
         self.ntu250AverageLabel.setObjectName(u"ntu250AverageLabel")
         self.ntu250AverageLabel.setGeometry(QRect(0, 65, 111, 21))
-        self.ntu250AverageLabel.setFont(font)
+        self.ntu250AverageLabel.setFont(custom_font12)
         self.ntu250AverageLabel.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
         self.ntu250ResetButton = QPushButton(self.ntu250Frame)
         self.ntu250ResetButton.setObjectName(u"ntu250ResetButton")
@@ -207,12 +210,12 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu250Label = QLabel(self.ntu250Frame)
         self.ntu250Label.setObjectName(u"ntu250Label")
         self.ntu250Label.setGeometry(QRect(1, 0, 111, 20))
-        self.ntu250Label.setFont(font)
+        self.ntu250Label.setFont(custom_font12)
         self.ntu250Label.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
         self.ntu250StdevLabel = QLabel(self.ntu250Frame)
         self.ntu250StdevLabel.setObjectName(u"ntu250StdevLabel")
         self.ntu250StdevLabel.setGeometry(QRect(0, 100, 111, 21))
-        self.ntu250StdevLabel.setFont(font)
+        self.ntu250StdevLabel.setFont(custom_font12)
         self.ntu250StdevLabel.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
         self.ntu250StdevSpinBox = QDoubleSpinBox(self.ntu250Frame)
         self.ntu250StdevSpinBox.setObjectName(u"ntu250StdevSpinBox")
@@ -227,7 +230,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu500Label = QLabel(self.ntu50Frame)
         self.ntu500Label.setObjectName(u"ntu500Label")
         self.ntu500Label.setGeometry(QRect(0, 0, 111, 21))
-        self.ntu500Label.setFont(font)
+        self.ntu500Label.setFont(custom_font12)
         self.ntu500Label.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
         self.ntu500StartButton = QPushButton(self.ntu50Frame)
         self.ntu500StartButton.setObjectName(u"ntu500StartButton")
@@ -238,7 +241,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu500AverageLabel = QLabel(self.ntu50Frame)
         self.ntu500AverageLabel.setObjectName(u"ntu500AverageLabel")
         self.ntu500AverageLabel.setGeometry(QRect(0, 65, 111, 21))
-        self.ntu500AverageLabel.setFont(font)
+        self.ntu500AverageLabel.setFont(custom_font12)
         self.ntu500AverageLabel.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
         self.ntu500AverageSpinBox = QDoubleSpinBox(self.ntu50Frame)
         self.ntu500AverageSpinBox.setObjectName(u"ntu500AverageSpinBox")
@@ -256,7 +259,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu500StdevLabel = QLabel(self.ntu50Frame)
         self.ntu500StdevLabel.setObjectName(u"ntu500StdevLabel")
         self.ntu500StdevLabel.setGeometry(QRect(0, 100, 111, 21))
-        self.ntu500StdevLabel.setFont(font)
+        self.ntu500StdevLabel.setFont(custom_font12)
         self.ntu500StdevLabel.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
         self.ntu500StdevSpinBox = QDoubleSpinBox(self.ntu50Frame)
         self.ntu500StdevSpinBox.setObjectName(u"ntu500StdevSpinBox")
@@ -271,7 +274,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu1000Label = QLabel(self.ntu1000Frame)
         self.ntu1000Label.setObjectName(u"ntu1000Label")
         self.ntu1000Label.setGeometry(QRect(0, 0, 111, 21))
-        self.ntu1000Label.setFont(font)
+        self.ntu1000Label.setFont(custom_font12)
         self.ntu1000Label.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
         self.ntu1000StartButton = QPushButton(self.ntu1000Frame)
         self.ntu1000StartButton.setObjectName(u"ntu1000StartButton")
@@ -282,7 +285,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu1000AverageLabel = QLabel(self.ntu1000Frame)
         self.ntu1000AverageLabel.setObjectName(u"ntu1000AverageLabel")
         self.ntu1000AverageLabel.setGeometry(QRect(0, 65, 111, 21))
-        self.ntu1000AverageLabel.setFont(font)
+        self.ntu1000AverageLabel.setFont(custom_font12)
         self.ntu1000AverageLabel.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
         self.ntu1000AverageSpinBox = QDoubleSpinBox(self.ntu1000Frame)
         self.ntu1000AverageSpinBox.setObjectName(u"ntu1000AverageSpinBox")
@@ -300,7 +303,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu1000StdevLabel = QLabel(self.ntu1000Frame)
         self.ntu1000StdevLabel.setObjectName(u"ntu1000StdevLabel")
         self.ntu1000StdevLabel.setGeometry(QRect(0, 100, 111, 21))
-        self.ntu1000StdevLabel.setFont(font)
+        self.ntu1000StdevLabel.setFont(custom_font12)
         self.ntu1000StdevLabel.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
         self.ntu1000StdevSpinBox = QDoubleSpinBox(self.ntu1000Frame)
         self.ntu1000StdevSpinBox.setObjectName(u"ntu500StdevSpinBox_2")
@@ -310,15 +313,11 @@ class OBSCalibratorApp(QMainWindow):
         self.findEquationButton = QPushButton(self.centralwidget)
         self.findEquationButton.setObjectName(u"findEquationButton")
         self.findEquationButton.setGeometry(QRect(5, 650, 101, 32))
-        font2 = QFont()
-        font2.setFamilies([u"PT Mono"])
-        font2.setPointSize(11)
-        self.findEquationButton.setFont(font2)
+        self.findEquationButton.setFont(custom_font11)
         self.equationLineEdit = QTextEdit(self.centralwidget)
         self.equationLineEdit.setObjectName(u"equationLineEdit")
         self.equationLineEdit.setGeometry(QRect(115, 650, 356, 31))
-        font2.setPointSize(12)
-        self.equationLineEdit.setFont(font2)
+        self.equationLineEdit.setFont(custom_font12)
         self.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(self)
         self.menubar.setObjectName(u"menubar")
@@ -504,31 +503,57 @@ class OBSCalibratorApp(QMainWindow):
         match self.ongoingSampling:
             case 100:
                 self.ntu100AverageSpinBox.setValue(mean)
-                self.ntu100StdevSpinBox.setValue(stdev)
                 if checkStdev:
+                    self.changeSpinBoxColor(self.ntu100StdevSpinBox, "black")
                     self.ntu100Complete = True
+                else:
+                    self.changeSpinBoxColor(self.ntu100StdevSpinBox, "red")
+                    self.ntu100Complete = False
+
+                self.ntu100StdevSpinBox.setValue(stdev)
 
             case 250:
                 self.ntu250AverageSpinBox.setValue(mean)
-                self.ntu250StdevSpinBox.setValue(stdev)
                 if checkStdev:
+                    self.changeSpinBoxColor(self.ntu250StdevSpinBox, "black")
                     self.ntu250Complete = True
+                else:
+                    self.changeSpinBoxColor(self.ntu250StdevSpinBox, "red")
+                    self.ntu250Complete = False
+
+                self.ntu250StdevSpinBox.setValue(stdev)
 
             case 500:
                 self.ntu500AverageSpinBox.setValue(mean)
-                self.ntu500StdevSpinBox.setValue(stdev)
                 if checkStdev:
+                    self.changeSpinBoxColor(self.ntu500StdevSpinBox, "black")
                     self.ntu500Complete = True
+                else:
+                    self.changeSpinBoxColor(self.ntu500StdevSpinBox, "red")
+                    self.ntu500Complete = False
+
+                self.ntu500StdevSpinBox.setValue(stdev)
 
             case 1000:
                 self.ntu1000AverageSpinBox.setValue(mean)
-                self.ntu1000StdevSpinBox.setValue(stdev)
                 if checkStdev:
+                    self.changeSpinBoxColor(self.ntu1000StdevSpinBox, "black")
                     self.ntu1000Complete = True
+                else:
+                    self.changeSpinBoxColor(self.ntu1000StdevSpinBox, "red")
+                    self.ntu1000Complete = False
+
+                self.ntu1000StdevSpinBox.setValue(stdev)
 
         self.ongoingSampling = 0
 
         self.checkforCompleteness()
+
+    def changeSpinBoxColor(self, spinBox, color) -> None:
+        spinBox.setStyleSheet(f"""
+            QDoubleSpinBox {{
+                color: {color};
+            }}""")
 
     def checkforCompleteness(self) -> None:
         if (self.ntu1000Complete and self.ntu250Complete and self.ntu500Complete and self.ntu100Complete):
