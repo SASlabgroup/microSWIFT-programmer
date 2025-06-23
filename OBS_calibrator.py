@@ -1,22 +1,21 @@
 import statistics
 import sys
-import random
 import time
-# import board
-# import busio
+import board
+import busio
 import adafruit_vcnl4010
 
 import numpy as np
 
-from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore
 from PyQt6.QtCore import QSize, QRect, Qt, pyqtSignal, QThread
-from PyQt6.QtGui import QPalette, QColor, QFont, QAction
-from PyQt6.QtWidgets import QMainWindow, QDialog, QVBoxLayout, QLabel, QApplication, QPushButton, QStyleFactory, \
-    QWidget, QFrame, QSizePolicy, QDoubleSpinBox, QTextEdit, QAbstractSpinBox, QLineEdit, QMenuBar, QMenu, QStatusBar
+from PyQt6.QtGui import QFont, QAction
+from PyQt6.QtWidgets import QMainWindow, QDialog, QVBoxLayout, QLabel, QApplication, QPushButton, QWidget, QFrame, \
+    QSizePolicy, QDoubleSpinBox, QTextEdit, QAbstractSpinBox, QMenuBar, QMenu, QStatusBar
 
 CALIBRATOR_MAJOR_VERSION = 1
 CALIBRATOR_MINOR_VERSION = 0
-NUMBER_OF_SAMPLES = 5
+NUMBER_OF_SAMPLES = 30
 
 class SensorThread(QThread):
     proximity_read = pyqtSignal(int)
@@ -26,16 +25,15 @@ class SensorThread(QThread):
         super().__init__(parent)
 
     def run(self) -> None:
-        # i2c = busio.I2C(board.SCL, board.SDA)
-        # sensor = adafruit_vcnl4010.VCNL4010(i2c)
+        i2c = busio.I2C(board.SCL, board.SDA)
+        sensor = adafruit_vcnl4010.VCNL4010(i2c)
         i = 0
         samples = []
         self._running = True
 
         while self._running:
             # Read the sensor
-            # proximity = sensor.proximity
-            proximity = 32768 + random.randint(-50, 50) # Testing code
+            proximity = sensor.proximity
             samples.append(proximity)
             self.proximity_read.emit(proximity)
             i += 1
