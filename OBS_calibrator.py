@@ -1,10 +1,11 @@
 import statistics
 import sys
+import os
 import time
 import board
-import busio
 import adafruit_vcnl4010
 
+import usb.core
 import numpy as np
 
 from PyQt6 import QtCore
@@ -17,6 +18,7 @@ CALIBRATOR_MAJOR_VERSION = 1
 CALIBRATOR_MINOR_VERSION = 0
 NUMBER_OF_SAMPLES = 30
 
+
 class SensorThread(QThread):
     proximity_read = pyqtSignal(int)
     finished = pyqtSignal(float, float)
@@ -25,7 +27,7 @@ class SensorThread(QThread):
         super().__init__(parent)
 
     def run(self) -> None:
-        i2c = busio.I2C(board.SCL, board.SDA)
+        i2c = board.I2C()
         sensor = adafruit_vcnl4010.VCNL4010(i2c)
         i = 0
         samples = []
@@ -78,12 +80,12 @@ Solution sampling:
 Place the sensor head into the well-mixed solution, maintianing the sensor head view clear of
 obstructions and 10-15cm from the bottom of the container.
 
-Click the start button which corresponds to the solution concentration and wait for the sampling to 
+Click the start button which corresponds to the solution concentration and wait for the sampling to
 complete (30 seconds).
 
-	If the sample series std. deviation is greater than 10% of the average value, the average value
-	field will turn red and be considered invalid. If this occurs, press the reset button for the 
-	given solution value and run the sampling again by pressing the start button.
+	If the sample series standard deviation is greater than 1% of the average value, the stdev
+	value field will turn red and be considered invalid. If this occurs, press the reset button
+	for the given solution value and re-run the sampling by pressing the start button.
 
 After sampling all solutions and obtaining valid average results, press the "Find Equation" button 
 to produce a polynomial best-fit line equation."""))
