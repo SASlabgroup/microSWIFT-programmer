@@ -1,11 +1,9 @@
 import statistics
 import sys
-import os
 import time
 import board
 import adafruit_vcnl4010
 
-import usb.core
 import numpy as np
 
 from PyQt6 import QtCore
@@ -101,6 +99,8 @@ class OBSCalibratorApp(QMainWindow):
     ntu250Complete = False
     ntu500Complete = False
     ntu1000Complete = False
+
+    defaultFont = None
 
     def __init__(self):
         super().__init__()
@@ -378,6 +378,11 @@ class OBSCalibratorApp(QMainWindow):
         self.actionHow_To_UseThisTool.setText(_translate("MainWindow", "How To Use This Tool"))
 
     def finishSetup(self) -> None:
+        cursor = self.ntu100TextEdit.textCursor()
+        char_format = cursor.charFormat()
+        self.defaultFont = char_format.font()
+        # self.defaultFont = self.ntu100StdevSpinBox.fontInfo()
+
         # Instantiate the Sensor Thread
         self.sensorThread = SensorThread()
 
@@ -500,13 +505,15 @@ class OBSCalibratorApp(QMainWindow):
                 self.ntu1000TextEdit.append(str(sample))
 
     def samplingComplete(self, mean, stdev) -> None:
-        checkStdev = lambda stdev, mean: (stdev / mean) < 0.01 if stdev != 0 else False
+        stdDevGood = False
+        if (stdev != 0):
+            stdDevGood = (stdev / mean) < 0.01
 
         match self.ongoingSampling:
             case 100:
                 self.ntu100AverageSpinBox.setValue(mean)
-                if checkStdev:
-                    self.changeSpinBoxColor(self.ntu100StdevSpinBox, "black")
+                if stdDevGood:
+                    self.changeSpinBoxColor(self.ntu100StdevSpinBox, "default")
                     self.ntu100Complete = True
                 else:
                     self.changeSpinBoxColor(self.ntu100StdevSpinBox, "red")
@@ -516,8 +523,8 @@ class OBSCalibratorApp(QMainWindow):
 
             case 250:
                 self.ntu250AverageSpinBox.setValue(mean)
-                if checkStdev:
-                    self.changeSpinBoxColor(self.ntu250StdevSpinBox, "black")
+                if stdDevGood:
+                    self.changeSpinBoxColor(self.ntu250StdevSpinBox, "default")
                     self.ntu250Complete = True
                 else:
                     self.changeSpinBoxColor(self.ntu250StdevSpinBox, "red")
@@ -527,8 +534,8 @@ class OBSCalibratorApp(QMainWindow):
 
             case 500:
                 self.ntu500AverageSpinBox.setValue(mean)
-                if checkStdev:
-                    self.changeSpinBoxColor(self.ntu500StdevSpinBox, "black")
+                if stdDevGood:
+                    self.changeSpinBoxColor(self.ntu500StdevSpinBox, "default")
                     self.ntu500Complete = True
                 else:
                     self.changeSpinBoxColor(self.ntu500StdevSpinBox, "red")
@@ -538,8 +545,8 @@ class OBSCalibratorApp(QMainWindow):
 
             case 1000:
                 self.ntu1000AverageSpinBox.setValue(mean)
-                if checkStdev:
-                    self.changeSpinBoxColor(self.ntu1000StdevSpinBox, "black")
+                if stdDevGood:
+                    self.changeSpinBoxColor(self.ntu1000StdevSpinBox, "default")
                     self.ntu1000Complete = True
                 else:
                     self.changeSpinBoxColor(self.ntu1000StdevSpinBox, "red")
@@ -552,10 +559,15 @@ class OBSCalibratorApp(QMainWindow):
         self.checkforCompleteness()
 
     def changeSpinBoxColor(self, spinBox, color) -> None:
-        spinBox.setStyleSheet(f"""
-            QDoubleSpinBox {{
-                color: {color};
-            }}""")
+
+        if (color == "default"):
+            self.ntu100StdevSpinBox.setStyleSheet("")
+            self.ntu100StdevSpinBox.setFont(self.defaultFont)
+        else:
+            spinBox.setStyleSheet(f"""
+                QDoubleSpinBox {{
+                    color: {color};
+                }}""")
 
     def checkforCompleteness(self) -> None:
         if (self.ntu1000Complete and self.ntu250Complete and self.ntu500Complete and self.ntu100Complete):
