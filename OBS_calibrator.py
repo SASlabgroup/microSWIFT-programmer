@@ -11,10 +11,12 @@ from PyQt6.QtCore import QSize, QRect, Qt, pyqtSignal, QThread
 from PyQt6.QtGui import QFont, QAction, QFontDatabase
 from PyQt6.QtWidgets import QMainWindow, QDialog, QVBoxLayout, QLabel, QApplication, QPushButton, QWidget, QFrame, \
     QSizePolicy, QDoubleSpinBox, QTextEdit, QAbstractSpinBox, QMenuBar, QMenu, QStatusBar
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 CALIBRATOR_MAJOR_VERSION = 1
 CALIBRATOR_MINOR_VERSION = 0
-NUMBER_OF_SAMPLES = 30
+NUMBER_OF_SAMPLES = 5
 
 
 class SensorThread(QThread):
@@ -54,6 +56,48 @@ class SensorThread(QThread):
         self._running = False
 
 
+class CalibrationPlot(QWidget):
+    def __init__(self, x_values, y_values):
+        super().__init__()
+        self.x_values = np.array(x_values)
+        self.y_values = np.array(y_values)
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle("Sensor Calibration Plot")
+        layout = QVBoxLayout()
+
+        # Create matplotlib figure and canvas
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        layout.addWidget(self.canvas)
+
+        # Calculate best fit line
+        coeffs = np.polyfit(self.x_values, self.y_values, 1)
+        slope, intercept = coeffs
+        y_fit = slope * self.x_values + intercept
+
+        # Calculate R^2 value
+        ss_res = np.sum((self.y_values - y_fit) ** 2)
+        ss_tot = np.sum((self.y_values - np.mean(self.y_values)) ** 2)
+        r_squared = 1 - (ss_res / ss_tot)
+
+        # Plotting
+        ax = self.figure.add_subplot(111)
+        ax.scatter(self.x_values, self.y_values, color='blue', label='Calibration Points')
+        ax.plot(self.x_values, y_fit, color='red', label='Best Fit Line')
+        ax.set_title("Calibration Curve")
+        ax.set_xlabel("Sensor Value")
+        ax.set_ylabel("Calibration Value")
+        ax.legend()
+
+        # Display equation and R^2
+        equation_label = QLabel(f"Line Equation: y = {slope:.4f}x + {intercept:.4f}")
+        r2_label = QLabel(f"R² Value: {r_squared:.4f}")
+        layout.addWidget(equation_label)
+        layout.addWidget(r2_label)
+
+        self.setLayout(layout)
 
 
 class HelpPopUpWindow(QDialog):
@@ -112,6 +156,7 @@ class OBSCalibratorApp(QMainWindow):
         font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
         custom_font11 = QFont(font_family, 11)
         custom_font12 = QFont(font_family, 12)
+        custom_font14 = QFont(font_family, 14)
 
         self.setObjectName(u"MainWindow")
         self.resize(475, 745)
@@ -163,10 +208,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu100TextEdit = QTextEdit(self.ntu100Frame)
         self.ntu100TextEdit.setObjectName(u"ntu100TextEdit")
         self.ntu100TextEdit.setGeometry(QRect(5, 145, 101, 491))
-        font1 = QFont()
-        font1.setFamilies([u"PT Mono"])
-        font1.setPointSize(14)
-        self.ntu100TextEdit.setFont(font1)
+        self.ntu100TextEdit.setFont(custom_font14)
         self.ntu100TextEdit.setLineWrapMode(QTextEdit.LineWrapMode.FixedColumnWidth)
         self.ntu100TextEdit.setLineWrapColumnOrWidth(10)
         self.ntu100TextEdit.setReadOnly(True)
@@ -188,7 +230,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu250TextEdit = QTextEdit(self.ntu250Frame)
         self.ntu250TextEdit.setObjectName(u"ntu250TextEdit")
         self.ntu250TextEdit.setGeometry(QRect(4, 145, 101, 491))
-        self.ntu250TextEdit.setFont(font1)
+        self.ntu250TextEdit.setFont(custom_font14)
         self.ntu250TextEdit.setLineWrapMode(QTextEdit.LineWrapMode.FixedColumnWidth)
         self.ntu250TextEdit.setLineWrapColumnOrWidth(10)
         self.ntu250TextEdit.setReadOnly(True)
@@ -254,7 +296,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu500TextEdit = QTextEdit(self.ntu50Frame)
         self.ntu500TextEdit.setObjectName(u"ntu500TextEdit")
         self.ntu500TextEdit.setGeometry(QRect(5, 145, 101, 491))
-        self.ntu500TextEdit.setFont(font1)
+        self.ntu500TextEdit.setFont(custom_font14)
         self.ntu500TextEdit.setLineWrapMode(QTextEdit.LineWrapMode.FixedColumnWidth)
         self.ntu500TextEdit.setLineWrapColumnOrWidth(10)
         self.ntu500TextEdit.setReadOnly(True)
@@ -298,7 +340,7 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu1000TextEdit = QTextEdit(self.ntu1000Frame)
         self.ntu1000TextEdit.setObjectName(u"ntu1000TextEdit")
         self.ntu1000TextEdit.setGeometry(QRect(6, 145, 101, 491))
-        self.ntu1000TextEdit.setFont(font1)
+        self.ntu1000TextEdit.setFont(custom_font14)
         self.ntu1000TextEdit.setLineWrapMode(QTextEdit.LineWrapMode.FixedColumnWidth)
         self.ntu1000TextEdit.setLineWrapColumnOrWidth(10)
         self.ntu1000TextEdit.setReadOnly(True)
@@ -312,14 +354,10 @@ class OBSCalibratorApp(QMainWindow):
         self.ntu1000StdevSpinBox.setGeometry(QRect(0, 120, 111, 22))
         self.ntu1000StdevSpinBox.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.ntu1000StdevSpinBox.setMaximum(65536.000000000000000)
-        self.findEquationButton = QPushButton(self.centralwidget)
-        self.findEquationButton.setObjectName(u"findEquationButton")
-        self.findEquationButton.setGeometry(QRect(5, 650, 101, 32))
-        self.findEquationButton.setFont(custom_font11)
-        self.equationLineEdit = QTextEdit(self.centralwidget)
-        self.equationLineEdit.setObjectName(u"equationLineEdit")
-        self.equationLineEdit.setGeometry(QRect(115, 650, 356, 31))
-        self.equationLineEdit.setFont(custom_font12)
+        self.findEquationButton = QPushButton(parent=self.centralwidget)
+        self.findEquationButton.setGeometry(QtCore.QRect(5, 650, 466, 32))
+        self.findEquationButton.setFont(custom_font12)
+        self.findEquationButton.setObjectName("findEquationButton")
         self.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(self)
         self.menubar.setObjectName(u"menubar")
@@ -372,7 +410,6 @@ class OBSCalibratorApp(QMainWindow):
                                                            "1                      2                      3                      4                      5                      6                      7                      8                      9                      10                      11                      12                      13                      14                      15                      16                      17                      18                      19                      20                      21                      22                      23                      24                      25                      26                      27                      28                      29                      30                     "))
         self.ntu1000StdevLabel.setText(_translate("MainWindow", "Std Dev"))
         self.findEquationButton.setText(_translate("MainWindow", "Find Equation"))
-        self.equationLineEdit.setText(_translate("MainWindow", "Best Fit Equation: "))
         self.menuMenu.setTitle(_translate("MainWindow", "Menu"))
         self.actionReset.setText(_translate("MainWindow", "Reset"))
         self.actionHow_To_UseThisTool.setText(_translate("MainWindow", "How To Use This Tool"))
@@ -423,7 +460,7 @@ class OBSCalibratorApp(QMainWindow):
         # Sampling is complete
         self.sensorThread.finished.connect(self.samplingComplete)
 
-        self.findEquationButton.clicked.connect(self.findEquation)
+        self.findEquationButton.clicked.connect(self.showCalibrationPlot)
 
     def startButtonClicked(self, ntu: int) -> None:
         self.ntu100StartButton.setDisabled(True)
@@ -587,50 +624,14 @@ class OBSCalibratorApp(QMainWindow):
         if not self.ntu1000Complete:
             self.ntu1000StartButton.setEnabled(True)
 
-    def findEquation(self) -> None:
-        x_points = [100.0, 250.0, 500.0, 1000.0]
-        y_points = [self.ntu100AverageSpinBox.value(), self.ntu250AverageSpinBox.value(),
-                    self.ntu500AverageSpinBox.value(), self.ntu1000AverageSpinBox.value()]
+    def showCalibrationPlot(self):
+        # Create and show the calibration plot window
+        x_vals = [100,250,500,1000]
+        y_vals = [self.ntu100AverageSpinBox.value(), self.ntu250AverageSpinBox.value(),
+                  self.ntu500AverageSpinBox.value(), self.ntu1000AverageSpinBox.value()]
 
-        # Fit a 3rd-degree polynomial
-        coeffs = np.polyfit(x_points, y_points, 3)
-
-        # Create a polynomial function from the coefficients
-        poly_func = np.poly1d(coeffs)
-
-        self.equationLineEdit.setText(self.format_polynomial_for_qtextedit(poly_func))
-
-    def format_polynomial_for_qtextedit(self, poly_func):
-        """
-        Formats a numpy.poly1d object into an HTML string for QTextEdit display.
-        """
-        terms = []
-        degree = poly_func.order
-        coeffs = poly_func.coefficients
-        for i, coeff in enumerate(coeffs):
-            power = degree - i
-            if abs(coeff) < 1e-6:
-                continue  # Skip near-zero coefficients
-
-            # Format coefficient
-            coeff_str = f"{coeff:.4f}"
-            if coeff > 0 and i != 0:
-                coeff_str = f"+ {coeff_str}"
-            elif coeff < 0:
-                coeff_str = f"- {abs(coeff):.4f}"
-
-            # Format term
-            if power == 0:
-                term = f"{coeff_str}"
-            elif power == 1:
-                term = f"{coeff_str}x"
-            else:
-                term = f"{coeff_str}x<sup>{power}</sup>"
-
-            terms.append(term)
-
-        return " ".join(terms)
-
+        self.plot_window = CalibrationPlot(x_vals, y_vals)
+        self.plot_window.show()
 
 
 def main():
