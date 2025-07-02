@@ -64,7 +64,7 @@ class CalibrationPlot(QWidget):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle("Sensor Calibration Plot")
+        self.setWindowTitle("OBS Calibration Plot")
         layout = QVBoxLayout()
 
         # Create matplotlib figure and canvas
@@ -84,11 +84,11 @@ class CalibrationPlot(QWidget):
 
         # Plotting
         ax = self.figure.add_subplot(111)
-        ax.scatter(self.x_values, self.y_values, color='blue', label='Calibration Points')
+        ax.scatter(self.x_values, self.y_values, color='blue', label='Sample Points')
         ax.plot(self.x_values, y_fit, color='red', label='Best Fit Line')
         ax.set_title("Calibration Curve")
         ax.set_xlabel("Sensor Value")
-        ax.set_ylabel("Calibration Value")
+        ax.set_ylabel("NTU")
         ax.legend()
 
         # Display equation and R^2
