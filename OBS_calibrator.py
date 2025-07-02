@@ -418,7 +418,6 @@ class OBSCalibratorApp(QMainWindow):
         cursor = self.ntu100TextEdit.textCursor()
         char_format = cursor.charFormat()
         self.defaultFont = char_format.font()
-        # self.defaultFont = self.ntu100StdevSpinBox.fontInfo()
 
         # Instantiate the Sensor Thread
         self.sensorThread = SensorThread()
@@ -434,6 +433,12 @@ class OBSCalibratorApp(QMainWindow):
 
         # Connect all the signals/slots
         self.connectUIElements()
+
+        # Reset complete flags
+        self.ntu100Complete = False
+        self.ntu250Complete = False
+        self.ntu500Complete = False
+        self.ntu1000Complete = False
 
     def connectUIElements(self) -> None:
         # On "Start" click, start button will disable reset button and start sampling
@@ -626,9 +631,9 @@ class OBSCalibratorApp(QMainWindow):
 
     def showCalibrationPlot(self):
         # Create and show the calibration plot window
-        x_vals = [100,250,500,1000]
-        y_vals = [self.ntu100AverageSpinBox.value(), self.ntu250AverageSpinBox.value(),
+        x_vals = [self.ntu100AverageSpinBox.value(), self.ntu250AverageSpinBox.value(),
                   self.ntu500AverageSpinBox.value(), self.ntu1000AverageSpinBox.value()]
+        y_vals = [100,250,500,1000]
 
         self.plot_window = CalibrationPlot(x_vals, y_vals)
         self.plot_window.show()
