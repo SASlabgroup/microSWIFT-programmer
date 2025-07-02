@@ -16,7 +16,7 @@ from matplotlib.figure import Figure
 
 CALIBRATOR_MAJOR_VERSION = 1
 CALIBRATOR_MINOR_VERSION = 0
-NUMBER_OF_SAMPLES = 5
+NUMBER_OF_SAMPLES = 30
 
 
 class SensorThread(QThread):
