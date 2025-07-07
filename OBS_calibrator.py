@@ -603,8 +603,8 @@ class OBSCalibratorApp(QMainWindow):
     def changeSpinBoxColor(self, spinBox, color) -> None:
 
         if (color == "default"):
-            self.ntu100StdevSpinBox.setStyleSheet("")
-            self.ntu100StdevSpinBox.setFont(self.defaultFont)
+            spinBox.setStyleSheet("")
+            spinBox.setFont(self.defaultFont)
         else:
             spinBox.setStyleSheet(f"""
                 QDoubleSpinBox {{
