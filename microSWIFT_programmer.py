@@ -148,7 +148,9 @@ class Worker(QThread):
                 "0x200C0000",  # download address
             ]
 
-            if not self.debugger_attached:
+            if self.debugger_attached:
+                command.append("-halt")
+            else:
                 command.append([
                     "--start",  # Start after programming and verification (at address 0x08000000)
                     "0x08000000"
