@@ -7,6 +7,7 @@ import requests
 import serial.tools.list_ports
 import re
 import subprocess
+import argparse
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtGui import QTextCharFormat, QColor, QGuiApplication, QFont, QTextCursor
@@ -17,7 +18,7 @@ from PyQt6.QtCore import pyqtSignal, QThread, Qt
 from datetime import datetime
 
 PROGRAMMER_MAJOR_VERSION = 1
-PROGRAMMER_MINOR_VERSION = 1
+PROGRAMMER_MINOR_VERSION = 3
 
 def download_microSWIFT_firmware():
     # Raw file URL on GitHub
@@ -49,11 +50,13 @@ class Worker(QThread):
     stdoutAvailable = pyqtSignal(str)
     stderrAvailable = pyqtSignal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, debugger_attached=False):
         super().__init__(parent)
+        self.debugger_attached = debugger_attached
 
     def run(self):
         firmwareBurnSuccessful = False
+        configBurnSuccessful = False
         systemOS = platform.system()
 
         if systemOS == "Darwin":  # MacOS
@@ -102,44 +105,85 @@ class Worker(QThread):
             self.writeError(f"Unexpected error: {str(e)}")
             firmwareBurnSuccessful = False
 
-        finally:
-            if firmwareBurnSuccessful:
-                command = [
-                    programmerPath,
-                    "--connect", "port=SWD",  # Specify the port (e.g., USB, JTAG)
-                    "--download", "firmware/config.bin",  # Firmware file to write to the device
-                    "0x083FFC00",  # download address
-                    "--verify",  # Verify after programming
-                    "--start", "0x08000000"  # Start after programming and verification (at address 0x08000000)
-                ]
 
-                # Burn the configuration bytes
-                try:
-                    process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if firmwareBurnSuccessful:
+            command = [
+                programmerPath,
+                "--connect", "port=SWD",  # Specify the port (e.g., USB, JTAG)
+                "--download", "firmware/config.bin",  # Firmware file to write to the device
+                "0x083FFC00",  # download address
+            ]
 
-                    # Do other work while the subprocess is running
-                    while process.poll() is None:
-                        # Retrieve output (if needed)
-                        stdout, stderr = process.communicate()
+            # Burn the configuration bytes
+            try:
+                process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-                        if stdout:
-                            cleanedText = re.sub(r'\x1b\[[0-9;]*[mG]', '', stdout)
-                            self.stdoutAvailable.emit(cleanedText)
+                # Do other work while the subprocess is running
+                while process.poll() is None:
+                    # Retrieve output (if needed)
+                    stdout, stderr = process.communicate()
 
-                    if process.returncode != 0:
-                        self.stderrAvailable.emit(f"\nProgramming Failed with code {process.returncode}")
+                    if stdout:
+                        cleanedText = re.sub(r'\x1b\[[0-9;]*[mG]', '', stdout)
+                        self.stdoutAvailable.emit(cleanedText)
 
-                except subprocess.CalledProcessError as e:
-                    # If there's an error, show the error message
-                    self.stderrAvailable.emit(f"/nError: {e.stderr}")
-                    self.stderrAvailable.emit(e.stdout)
-                except Exception as e:
-                    self.writeError(f"Unexpected error: {str(e)}")
+                if process.returncode != 0:
+                    self.stderrAvailable.emit(f"\nProgramming Failed with code {process.returncode}")
 
-                finally:
-                    self.finished.emit()
+                else:
+                    configBurnSuccessful = True;
+
+            except subprocess.CalledProcessError as e:
+                # If there's an error, show the error message
+                self.stderrAvailable.emit(f"/nError: {e.stderr}")
+                self.stderrAvailable.emit(e.stdout)
+            except Exception as e:
+                self.writeError(f"Unexpected error: {str(e)}")
+
+        if configBurnSuccessful:
+            command = [
+                programmerPath,
+                "--connect", "port=SWD",  # Specify the port (e.g., USB, JTAG)
+                "--download", "firmware/zeros_64k.bin",  # Firmware file to write to the device
+                "0x200C0000",  # download address
+            ]
+
+            if self.debugger_attached:
+                command.append("-halt")
             else:
-                self.finished.emit()
+                command.append([
+                    "--start",  # Start after programming and verification (at address 0x08000000)
+                    "0x08000000"
+                ])
+
+            # Burn the configuration bytes
+            try:
+                process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                # Do other work while the subprocess is running
+                while process.poll() is None:
+                    # Retrieve output (if needed)
+                    stdout, stderr = process.communicate()
+
+                    if stdout:
+                        cleanedText = re.sub(r'\x1b\[[0-9;]*[mG]', '', stdout)
+                        self.stdoutAvailable.emit(cleanedText)
+
+                if process.returncode != 0:
+                    self.stderrAvailable.emit(f"\nProgramming Failed with code {process.returncode}")
+
+                else:
+                    configBurnSuccessful = True;
+
+            except subprocess.CalledProcessError as e:
+                # If there's an error, show the error message
+                self.stderrAvailable.emit(f"/nError: {e.stderr}")
+                self.stderrAvailable.emit(e.stdout)
+            except Exception as e:
+                self.writeError(f"Unexpected error: {str(e)}")
+
+
+        self.finished.emit()
 
 
 class ProgrammerApp(QMainWindow):
@@ -147,10 +191,11 @@ class ProgrammerApp(QMainWindow):
     stlink_port = ""
     configFilePath = "firmware/config.bin"
 
-    def __init__(self, bypasss_firmware_update, firmware_updated):
+    def __init__(self, bypasss_firmware_update, firmware_updated, debugger_attached):
         super().__init__()
         self.bypass_firmware_update = bypasss_firmware_update
         self.firmware_updated = firmware_updated
+        self.debugger_attached = debugger_attached
         self.setupUi()
 
     def setupUi(self):
@@ -542,7 +587,7 @@ class ProgrammerApp(QMainWindow):
 
     def finishSetup(self):
         # Added functionality
-        self.worker = Worker()
+        self.worker = Worker(debugger_attached=self.debugger_attached)
         self.thread = QThread()
         self.worker.moveToThread(self.thread)
         self.scene = QGraphicsScene()
@@ -1039,27 +1084,33 @@ class ProgrammerApp(QMainWindow):
         self.thread.wait()
         os.remove(self.configFilePath)
 
+
 def main():
-    arguments = []
-    bypass_firmware_update = False
     firmware_updated = False
+    debugger_attached = False
 
-    if len(sys.argv) > 1:
-        arguments = sys.argv[1:]
-        bypass_firmware_update = arguments[0] == "--no_firmware_update"
+    parser = argparse.ArgumentParser()
 
-    if len(arguments) > 0 and not bypass_firmware_update:
-        print("Unknown argument passed {arg}.".format(arg=arguments[0]))
-        sys.exit(1)
+    parser.add_argument('--no_firmware_update', action='store_true',
+                        help='Disable automatic firmware download')
+    parser.add_argument('--debugger_attached', action='store_true',
+                        help='Disable automatic program start after flashing')
+
+    args = parser.parse_args()
+
+    if not args.no_firmware_update:
+        firmware_updated = download_microSWIFT_firmware()
+    debugger_attached = args.debugger_attached
 
     app = QtWidgets.QApplication(sys.argv)
 
-    if not bypass_firmware_update:
-        firmware_updated = download_microSWIFT_firmware()
-
-    programmer = ProgrammerApp(bypass_firmware_update, firmware_updated)
+    programmer = ProgrammerApp(args.no_firmware_update, firmware_updated, debugger_attached)
     programmer.show()
     sys.exit(app.exec())
+
+
+
+
 
 if __name__ == "__main__":
     main()
