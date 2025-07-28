@@ -88,11 +88,12 @@ Frame {
                 id: numSamplesSpinBoxTextInput
                 text: numSamplesSpinBox.value.toString()
                 font: numSamplesSpinBox.font
-                color: numSamplesSpinBox.palette.text  // Use the SpinBox's text color
+                color: numSamplesSpinBox.palette.text
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 validator: numSamplesSpinBox.validator
                 inputMethodHints: Qt.ImhFormattedNumbersOnly
+                enabled: numSamplesSpinBox.enabled
 
                 onTextChanged: {
                     numSamplesSpinBox.value = parseInt(text)
@@ -148,7 +149,7 @@ Frame {
             contentItem: TextInput {
                 text: stdevSpinBox.value.toString()
                 font: stdevSpinBox.font
-                color: stdevSpinBox.textColor
+                color: stdevSpinBox.enabled ? stdevSpinBox.textColor : stdevSpinBox.palette.disabled.text
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 readOnly: true

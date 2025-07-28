@@ -47,6 +47,10 @@ class UIController(QObject):
                         lambda  value=sample_count, idx=i: self.handle_sample_count_change(idx, value)
                     )
 
+                reset_button = component.findChild(QObject, "resetButton")
+                if reset_button:
+                    reset_button.clicked.connect(lambda idx=i: self.reset_component(idx))
+
         self.sensor_thread.proximity_read.connect(self.update_samples_text_area)
         self.sensor_thread.finished.connect(self.handle_sensor_finished)
 
@@ -58,11 +62,18 @@ class UIController(QObject):
         if self.active_component_index == index:
             self.sensor_thread.set_sample_count(value)
 
+    def _enable_sampling_controls(self, component):
+        for name in ["startButton", "numSamplesSpinBox", "ntuConcentrationSpinBox"]:
+            field = component.findChild(QObject, name)
+            if field:
+                field.setProperty("enabled", True)
+
     def handle_sensor_finished(self, mean, stdev):
         if self.active_component_index is None:
             return
 
         component = self.ntu_components[self.active_component_index]
+        self._enable_sampling_controls(component)
 
         average_spinbox = component.findChild(QObject, "averageSpinBox")
         stdev_spinbox = component.findChild(QObject, "stdevSpinBox")
@@ -71,12 +82,32 @@ class UIController(QObject):
             average_spinbox.setProperty("value", mean)
 
         if stdev_spinbox:
+            stdev_spinbox.setProperty("value", stdev)
             if mean > 0 and stdev > 0.01 * mean:
                 stdev_spinbox.setProperty("textColor", "red")
             else:
                 stdev_spinbox.setProperty("textColor", "white")
 
-            stdev_spinbox.setProperty("value", stdev)
+    def reset_component(self, index):
+        if self.sensor_thread.isRunning():
+            self.sensor_thread.stop()
+            self.sensor_thread.wait()
+
+        component = self.ntu_components[index]
+        self._enable_sampling_controls(component)
+
+        samples_text_area = component.findChild(QObject, "samplesTextArea")
+        if samples_text_area:
+            samples_text_area.setProperty("text", "")
+
+        average_spinbox = component.findChild(QObject, "averageSpinBox")
+        if average_spinbox:
+            average_spinbox.setProperty("value", 0)
+
+        stdev_spinbox = component.findChild(QObject, "stdevSpinBox")
+        if stdev_spinbox:
+            stdev_spinbox.setProperty("value", 0)
+            stdev_spinbox.setProperty("textColor", "white")
 
     def update_ntu_components(self):
         # Get the current value from the spinbox
@@ -90,13 +121,22 @@ class UIController(QObject):
 
     def start_sensor(self, index):
         component = self.ntu_components[index]
+        self.reset_component(index)
+
+        # Force commit of spinbox value
         num_samples_spinbox = component.findChild(QObject, "numSamplesSpinBox")
         if num_samples_spinbox:
-            # Force read the current value directly
             sample_count = num_samples_spinbox.property("value")
             self.sensor_thread.set_sample_count(sample_count)
 
         self.active_component_index = index
+
+        # Disable only the relevant fields
+        for name in ["startButton", "numSamplesSpinBox", "ntuConcentrationSpinBox"]:
+            field = component.findChild(QObject, name)
+            if field:
+                field.setProperty("enabled", False)
+
         self.sensor_thread.start()
 
     def update_samples_text_area(self, value):
