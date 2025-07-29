@@ -19,12 +19,6 @@ os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"
 class UIController(QObject):
     def __init__(self, root_object):
 
-        def make_sample_count_updater(index):
-            def updater(value):
-                self.sensor_thread.set_sample_count(value)
-
-            return updater
-
         super().__init__()
         self.root = root_object
         self.sensor_thread = SensorThread()
