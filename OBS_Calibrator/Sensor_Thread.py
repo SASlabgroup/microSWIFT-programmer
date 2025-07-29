@@ -21,6 +21,7 @@ class SensorThread(QThread):
         # i2c = board.I2C()
         # sensor = adafruit_vcnl4010.VCNL4010(i2c)
         samples = []
+        proximity = 0
 
         for i in range(self.sample_count):
             if self._running:
@@ -40,8 +41,11 @@ class SensorThread(QThread):
             stdev = statistics.stdev(samples)
 
             self._running = False
-            self.finished.emit(mean, stdev)
+        else:
+            mean = proximity
+            stdev = 0
 
+        self.finished.emit(mean, stdev)
 
 
     def stop(self):

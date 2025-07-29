@@ -88,6 +88,9 @@ class UIController(QObject):
             else:
                 stdev_spinbox.setProperty("textColor", "white")
 
+        for i in range(self.root.findChild(QObject, "numCalibrationPointsSpinBox").property("value")):
+            self.ntu_components[i].setProperty("enabled", True)
+
     def reset_component(self, index):
         if self.sensor_thread.isRunning():
             self.sensor_thread.stop()
@@ -136,6 +139,10 @@ class UIController(QObject):
             field = component.findChild(QObject, name)
             if field:
                 field.setProperty("enabled", False)
+
+        for i in range(10):
+            self.ntu_components[i].setProperty("enabled", i == self.active_component_index)
+
 
         self.sensor_thread.start()
 
