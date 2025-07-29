@@ -21,6 +21,8 @@ class UIController(QObject):
         self.root = root_object
         self.sensor_thread = SensorThread()
         self.active_component_index = None
+        self.num_points = 1
+        self.cal_point_complete = [False] * 10
 
         # Grab references to all the things we're going to need often
         self.ntu_components = [self.root.findChild(QObject, f"ntuComponent{i}") for i in range(10)]
@@ -51,7 +53,6 @@ class UIController(QObject):
 
         # Connect signals
         self.num_calibration_points_spinbox.valueChanged.connect(self.update_ntu_components)
-        # self.saveSampleDataButton.clicked.connect(self.save_sample_data)
 
     def handle_sample_count_change(self, index, value):
         if self.active_component_index == index:
@@ -82,6 +83,7 @@ class UIController(QObject):
                 stdev_spinbox.setProperty("textColor", "red")
             else:
                 stdev_spinbox.setProperty("textColor", "white")
+                self.cal_point_complete[self.active_component_index] = True
 
         for i in range(self.root.findChild(QObject, "numCalibrationPointsSpinBox").property("value")):
             self.ntu_components[i].setProperty("enabled", True)
@@ -113,6 +115,7 @@ class UIController(QObject):
     def update_ntu_components(self):
         # Get the current value from the spinbox
         value = self.num_calibration_points_spinbox.property("value")
+        self.num_points = value
 
         # Enable only the required number of NTU components
         for i in range(10):
@@ -169,8 +172,6 @@ class UIController(QObject):
             return
 
         all_samples = []
-
-        print(f"Selected file path: {file_url}")
 
         for component in self.ntu_components:
             try:

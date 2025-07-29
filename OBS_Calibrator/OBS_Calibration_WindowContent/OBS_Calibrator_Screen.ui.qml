@@ -239,7 +239,6 @@ Rectangle {
         defaultSuffix: "csv"
 
         onAccepted: {
-            console.log("Selected file:", saveDialog.currentFile)
             controller.saveSampleData(saveDialog.currentFile)
         }
 
