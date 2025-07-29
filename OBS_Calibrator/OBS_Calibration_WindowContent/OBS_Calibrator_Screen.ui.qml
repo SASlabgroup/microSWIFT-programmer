@@ -1,14 +1,10 @@
 
-/*
-This is a UI file (.ui.qml) that is intended to be edited in Qt Design Studio only.
-It is supposed to be strictly declarative and only uses a subset of QML. If you edit
-this file manually, you might introduce QML code that is not supported by Qt Design Studio.
-Check out https://doc.qt.io/qtcreator/creator-quick-ui-forms.html for details on .ui.qml files.
-*/
-
 import QtQuick
 import QtQuick.Controls
 import OBS_Calibration_Window
+import QtQuick.Dialogs
+import Qt.labs.platform 1.1
+
 
 Rectangle {
     id: rectangle
@@ -115,8 +111,18 @@ Rectangle {
         width: 200
         height: 32
         text: qsTr("Save Sample Data")
-        enabled: false
+        enabled: true
         font.family: "PT Mono"
+
+        onClicked: {
+            let serial = serialNumberTextField.text;
+            let filename = "calibration_sample_data_sn_" + serial + ".csv";
+
+            let downloadsPath = StandardPaths.standardLocations(StandardPaths.DownloadLocation)[0];
+            saveDialog.currentFile = downloadsPath + "/" + filename;
+
+            saveDialog.open();
+        }
     }
 
     Button {
@@ -223,5 +229,23 @@ Rectangle {
 
     Component.onCompleted: {
         helpButton.onClicked.connect(() => helpPopup.open())
+    }
+
+    FileDialog {
+        id: saveDialog
+        title: "Save Sample Data"
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["CSV files (*.csv)"]
+        defaultSuffix: "csv"
+
+        onAccepted: {
+            console.log("Selected file:", saveDialog.currentFile)
+            controller.saveSampleData(saveDialog.currentFile)
+        }
+
+
+        onRejected: {
+            console.log("Save dialog was canceled.")
+        }
     }
 }

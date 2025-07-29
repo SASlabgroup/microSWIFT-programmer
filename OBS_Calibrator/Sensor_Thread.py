@@ -26,7 +26,7 @@ class SensorThread(QThread):
         for i in range(self.sample_count):
             if self._running:
                 # proximity = sensor.proximity
-                proximity = random.randint(0,65535)
+                proximity = random.randint(32750,32790)
                 samples.append(proximity)
                 self.proximity_read.emit(proximity)
                 if i < (self.sample_count - 1):

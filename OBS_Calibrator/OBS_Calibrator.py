@@ -1,11 +1,11 @@
 
-import sys
-from functools import partial
 from pathlib import Path
 
+import sys
 import os
+import csv
 
-from PySide6.QtCore import QObject
+from PySide6.QtCore import QObject, QUrl, Slot
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
@@ -13,8 +13,6 @@ from Sensor_Thread import SensorThread
 from Python.autogen.settings import url, import_paths
 
 os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"
-
-
 
 class UIController(QObject):
     def __init__(self, root_object):
@@ -24,10 +22,13 @@ class UIController(QObject):
         self.sensor_thread = SensorThread()
         self.active_component_index = None
 
-        self.ntu_components = [
-            self.root.findChild(QObject, f"ntuComponent{i}") for i in range(10)
-        ]
+        # Grab references to all the things we're going to need often
+        self.ntu_components = [self.root.findChild(QObject, f"ntuComponent{i}") for i in range(10)]
+        self.serialNumberTextField = self.root.findChild(QObject, "serialNumberTextField")
+        self.num_calibration_points_spinbox = self.root.findChild(QObject, "numCalibrationPointsSpinBox")
+        self.saveSampleDataButton = self.root.findChild(QObject, "saveSampleData")
 
+        # Set up the NTU Concentration Components
         for i, component in enumerate(self.ntu_components):
             if component:
                 start_button = component.findChild(QObject, "startButton")
@@ -48,9 +49,9 @@ class UIController(QObject):
         self.sensor_thread.proximity_read.connect(self.update_samples_text_area)
         self.sensor_thread.finished.connect(self.handle_sensor_finished)
 
-        # Connect signal
-        self.num_calibration_points_spinbox = self.root.findChild(QObject, "numCalibrationPointsSpinBox")
+        # Connect signals
         self.num_calibration_points_spinbox.valueChanged.connect(self.update_ntu_components)
+        # self.saveSampleDataButton.clicked.connect(self.save_sample_data)
 
     def handle_sample_count_change(self, index, value):
         if self.active_component_index == index:
@@ -84,6 +85,9 @@ class UIController(QObject):
 
         for i in range(self.root.findChild(QObject, "numCalibrationPointsSpinBox").property("value")):
             self.ntu_components[i].setProperty("enabled", True)
+
+        # Enable the save sample data button
+        self.saveSampleDataButton.setProperty("enabled", True)
 
     def reset_component(self, index):
         if self.sensor_thread.isRunning():
@@ -134,6 +138,8 @@ class UIController(QObject):
             if field:
                 field.setProperty("enabled", False)
 
+        self.saveSampleDataButton.setProperty("enabled", False)
+
         for i in range(10):
             self.ntu_components[i].setProperty("enabled", i == self.active_component_index)
 
@@ -148,6 +154,59 @@ class UIController(QObject):
                 current_text = text_area.property("text") or ""
                 new_text = f"{current_text}\n{value}" if current_text else str(value)
                 text_area.setProperty("text", new_text)
+
+    @Slot(str)
+    def saveSampleData(self, file_url):
+        if not file_url or not file_url.startswith("file://"):
+            print("No file selected or invalid path.")
+            return
+
+        file_path = file_url.replace("file://", "")
+        file_path = os.path.expanduser(file_path)
+
+        if not file_path.strip():
+            print("File path is empty after processing.")
+            return
+
+        all_samples = []
+
+        print(f"Selected file path: {file_url}")
+
+        for component in self.ntu_components:
+            try:
+                concentration_field = component.findChild(QObject, "ntuConcentrationSpinBox")
+                sample_area = component.findChild(QObject, "samplesTextArea")
+
+                if not concentration_field or not sample_area:
+                    continue  # Skip if either child is missing
+
+                concentration = float(concentration_field.property("value"))
+                sample_lines = sample_area.property("text").splitlines()
+
+                for line in sample_lines:
+                    line = line.strip()
+                    if line:
+                        try:
+                            reading = int(line)
+                            all_samples.append((concentration, reading))
+                        except ValueError:
+                            continue  # Skip invalid lines
+            except Exception as e:
+                print(f"Error processing component: {e}")
+                continue
+
+        # Sort samples by NTU concentration
+        all_samples.sort(key=lambda x: x[0])
+
+        try:
+            with open(file_path, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(["NTU concentration", "sensor reading"])
+                writer.writerows(all_samples)
+            print(f"Sample data saved to {file_path}")
+        except Exception as e:
+            print(f"Error saving file: {e}")
+
 
 
 if __name__ == '__main__':
@@ -165,6 +224,9 @@ if __name__ == '__main__':
         sys.exit(-1)
 
     root_object = engine.rootObjects()[0]
-    ui = UIController(root_object)
+    controller = UIController(root_object)  # Your controller class instance
+    engine.rootContext().setContextProperty("controller", controller)
+
+    engine.load(QUrl("OBS_Calibrator/OBS_Calibration_WindowContent/OBS_Calibrator_Screen.ui.qml"))
 
     sys.exit(app.exec())
