@@ -47,7 +47,6 @@ def download_microSWIFT_firmware():
         return False
 
 
-
 class Worker(QThread):
     finished = pyqtSignal()
     stdoutAvailable = pyqtSignal(str)
