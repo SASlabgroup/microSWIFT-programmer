@@ -593,7 +593,7 @@
       <rect>
        <x>10</x>
        <y>11</y>
-       <width>307</width>
+       <width>281</width>
        <height>94</height>
       </rect>
      </property>
@@ -624,6 +624,33 @@
           </property>
           <property name="text">
            <string>Match GNSS period</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_2">
+        <item>
+         <widget class="QLabel" name="turbiditySerialNumberLabel">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="text">
+           <string>Serial Number</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="turbiditySerialNumberSpinBox">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="buttonSymbols">
+           <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
+          </property>
+          <property name="maximum">
+           <number>65535</number>
           </property>
          </widget>
         </item>

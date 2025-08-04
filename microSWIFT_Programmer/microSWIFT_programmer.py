@@ -18,7 +18,8 @@ from PyQt6.QtCore import pyqtSignal, QThread, Qt
 from datetime import datetime
 
 PROGRAMMER_MAJOR_VERSION = 1
-PROGRAMMER_MINOR_VERSION = 3
+PROGRAMMER_MINOR_VERSION = 2
+
 
 def download_microSWIFT_firmware():
     # Raw file URL on GitHub
@@ -32,7 +33,8 @@ def download_microSWIFT_firmware():
     os.makedirs(firmware_dir, exist_ok=True)
 
     try:
-        response = requests.get(url, stream=True)
+        # Add a timeout (in seconds)
+        response = requests.get(url, stream=True, timeout=10)
         response.raise_for_status()  # Raise an error on bad HTTP status
 
         # Write the file (overwrite if exists)
@@ -41,8 +43,9 @@ def download_microSWIFT_firmware():
                 f.write(chunk)
 
         return True
-    except requests.RequestException as e:
+    except (requests.RequestException, requests.Timeout):
         return False
+
 
 
 class Worker(QThread):
@@ -50,9 +53,8 @@ class Worker(QThread):
     stdoutAvailable = pyqtSignal(str)
     stderrAvailable = pyqtSignal(str)
 
-    def __init__(self, parent=None, debugger_attached=False):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.debugger_attached = debugger_attached
 
     def run(self):
         firmwareBurnSuccessful = False
@@ -71,11 +73,8 @@ class Worker(QThread):
             programmerPath,
             "--connect", "port=SWD",  # Specify the port (e.g., USB, JTAG)
             "--download", "firmware/microSWIFT_V2.2.elf",  # Firmware file to write to the device
-            "0x08000000",  # download address
             "--verify",  # Verify after programming
         ]
-
-        # command = [programmerPath,"--connect"]
 
         # Burn the firmware first
         try:
@@ -94,17 +93,14 @@ class Worker(QThread):
                 firmwareBurnSuccessful = True
             else:
                 self.stderrAvailable.emit(f"\nProgramming Failed with code {process.returncode}")
-                firmwareBurnSuccessful = False
+
 
         except subprocess.CalledProcessError as e:
             # If there's an error, show the error message
             self.stderrAvailable.emit(f"/nError: {e.stderr}")
             self.stderrAvailable.emit(e.stdout)
-            firmwareBurnSuccessful = False
         except Exception as e:
-            self.writeError(f"Unexpected error: {str(e)}")
-            firmwareBurnSuccessful = False
-
+            self.stderrAvailable.emit(f"Unexpected error: {str(e)}")
 
         if firmwareBurnSuccessful:
             command = [
@@ -138,7 +134,7 @@ class Worker(QThread):
                 self.stderrAvailable.emit(f"/nError: {e.stderr}")
                 self.stderrAvailable.emit(e.stdout)
             except Exception as e:
-                self.writeError(f"Unexpected error: {str(e)}")
+                self.stdoutAvailable.emit(f"Unexpected error: {str(e)}")
 
         if configBurnSuccessful:
             command = [
@@ -147,14 +143,6 @@ class Worker(QThread):
                 "--download", "firmware/zeros_64k.bin",  # Firmware file to write to the device
                 "0x200C0000",  # download address
             ]
-
-            if self.debugger_attached:
-                command.append("-halt")
-            else:
-                command.append([
-                    "--start",  # Start after programming and verification (at address 0x08000000)
-                    "0x08000000"
-                ])
 
             # Burn the configuration bytes
             try:
@@ -172,16 +160,12 @@ class Worker(QThread):
                 if process.returncode != 0:
                     self.stderrAvailable.emit(f"\nProgramming Failed with code {process.returncode}")
 
-                else:
-                    configBurnSuccessful = True;
-
             except subprocess.CalledProcessError as e:
                 # If there's an error, show the error message
                 self.stderrAvailable.emit(f"/nError: {e.stderr}")
                 self.stderrAvailable.emit(e.stdout)
             except Exception as e:
-                self.writeError(f"Unexpected error: {str(e)}")
-
+                self.stderrAvailable.emit(f"Unexpected error: {str(e)}")
 
         self.finished.emit()
 
@@ -191,11 +175,10 @@ class ProgrammerApp(QMainWindow):
     stlink_port = ""
     configFilePath = "firmware/config.bin"
 
-    def __init__(self, bypasss_firmware_update, firmware_updated, debugger_attached):
+    def __init__(self, bypasss_firmware_update, firmware_updated):
         super().__init__()
         self.bypass_firmware_update = bypasss_firmware_update
         self.firmware_updated = firmware_updated
-        self.debugger_attached = debugger_attached
         self.setupUi()
 
     def setupUi(self):
@@ -477,7 +460,7 @@ class ProgrammerApp(QMainWindow):
         self.turbidityFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.turbidityFrame.setObjectName("turbidityFrame")
         self.layoutWidget_2 = QtWidgets.QWidget(parent=self.turbidityFrame)
-        self.layoutWidget_2.setGeometry(QtCore.QRect(10, 11, 307, 94))
+        self.layoutWidget_2.setGeometry(QtCore.QRect(10, 11, 281, 94))
         self.layoutWidget_2.setObjectName("layoutWidget_2")
         self.turbidityVerticalLayout = QtWidgets.QVBoxLayout(self.layoutWidget_2)
         self.turbidityVerticalLayout.setContentsMargins(0, 0, 0, 0)
@@ -498,6 +481,19 @@ class ProgrammerApp(QMainWindow):
         self.turbidityMatchGNSSCheckbox.setObjectName("turbidityMatchGNSSCheckbox")
         self.turbidityEnableHorizLayout.addWidget(self.turbidityMatchGNSSCheckbox)
         self.turbidityVerticalLayout.addLayout(self.turbidityEnableHorizLayout)
+        self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
+        self.turbiditySerialNumberLabel = QtWidgets.QLabel(parent=self.layoutWidget_2)
+        self.turbiditySerialNumberLabel.setEnabled(False)
+        self.turbiditySerialNumberLabel.setObjectName("turbiditySerialNumberLabel")
+        self.horizontalLayout_2.addWidget(self.turbiditySerialNumberLabel)
+        self.turbiditySerialNumberSpinBox = QtWidgets.QSpinBox(parent=self.layoutWidget_2)
+        self.turbiditySerialNumberSpinBox.setEnabled(False)
+        self.turbiditySerialNumberSpinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.ButtonSymbols.NoButtons)
+        self.turbiditySerialNumberSpinBox.setMaximum(65535)
+        self.turbiditySerialNumberSpinBox.setObjectName("turbiditySerialNumberSpinBox")
+        self.horizontalLayout_2.addWidget(self.turbiditySerialNumberSpinBox)
+        self.turbidityVerticalLayout.addLayout(self.horizontalLayout_2)
         self.turbiditySamplesHorizLayout = QtWidgets.QHBoxLayout()
         self.turbiditySamplesHorizLayout.setObjectName("turbiditySamplesHorizLayout")
         self.turbidityNumSamplesLabel = QtWidgets.QLabel(parent=self.layoutWidget_2)
@@ -552,6 +548,7 @@ class ProgrammerApp(QMainWindow):
         self.downloadConfigFile.setText(_translate("MainWindow", "Download Config"))
         self.turbidityEnableButton.setText(_translate("MainWindow", "Enable Turbidity"))
         self.turbidityMatchGNSSCheckbox.setText(_translate("MainWindow", "Match GNSS period"))
+        self.turbiditySerialNumberLabel.setText(_translate("MainWindow", "Serial Number"))
         self.turbidityNumSamplesLabel.setText(_translate("MainWindow", "Number of samples @ 1Hz"))
 
     def adjust_font_color_based_on_background(self, text_edit: QTextEdit):
@@ -587,7 +584,7 @@ class ProgrammerApp(QMainWindow):
 
     def finishSetup(self):
         # Added functionality
-        self.worker = Worker(debugger_attached=self.debugger_attached)
+        self.worker = Worker()
         self.thread = QThread()
         self.worker.moveToThread(self.thread)
         self.scene = QGraphicsScene()
@@ -684,6 +681,7 @@ class ProgrammerApp(QMainWindow):
                       uint32_t total_light_samples;
                       uint32_t light_sensor_gain;
                       uint32_t total_turbidity_samples;
+                      uint16_t turbidity_serial_number;
 
                       bool iridium_v3f;
                       bool gnss_high_performance_mode;
@@ -717,7 +715,7 @@ class ProgrammerApp(QMainWindow):
 
         v3f = self.iridiumTypeComboBox.currentText() == "V3F"
 
-        configStruct = struct.pack("<LLLLLLLLL??????11s9s",
+        configStruct = struct.pack("<LLLLLLLLLH??????11s9s",
                                    int(self.trackingNumberSpinBox.value()),
                                    int(self.gnssNumSamplesSpinBox.value()),
                                    int(self.dutyCycleSpinBox.value()),
@@ -727,6 +725,7 @@ class ProgrammerApp(QMainWindow):
                                    int(self.lightNumSamplesSpinBox.value()),
                                    int(self.lightGainComboBox.currentIndex()),
                                    int(self.turbidityNumSamplesSpinBox.value()),
+                                   int(self.turbiditySerialNumberSpinBox.value()),
                                    bool(self.iridiumTypeComboBox.currentText() == "V3F"),
                                    bool(self.gnssHighPerformanceModeCheckBox.isChecked()),
                                    bool(self.ctEnableButton.isChecked()),
@@ -742,7 +741,6 @@ class ProgrammerApp(QMainWindow):
         return configStruct
     def assembleBinaryConfigFile(self):
         with open(self.configFilePath, "wb") as configFile:
-
             configFile.write(self.assembleBinaryConfigStruct())
 
     def fillComboBoxes(self):
@@ -854,10 +852,14 @@ class ProgrammerApp(QMainWindow):
             self.turbidityNumSamplesLabel.setEnabled(True)
             self.turbidityNumSamplesSpinBox.setEnabled(True)
             self.turbidityMatchGNSSCheckbox.setEnabled(True)
+            self.turbiditySerialNumberLabel.setEnabled(True)
+            self.turbiditySerialNumberSpinBox.setEnabled(True)
         else:
             self.turbidityNumSamplesLabel.setDisabled(True)
             self.turbidityNumSamplesSpinBox.setDisabled(True)
             self.turbidityMatchGNSSCheckbox.setDisabled(True)
+            self.turbiditySerialNumberLabel.setDisabled(True)
+            self.turbiditySerialNumberSpinBox.setDisabled(True)
 
         self.resetVerifyButton()
 
@@ -1082,29 +1084,25 @@ class ProgrammerApp(QMainWindow):
     def threadFinished(self):
         self.thread.quit()
         self.thread.wait()
-        os.remove(self.configFilePath)
+        # os.remove(self.configFilePath)
 
 
 def main():
     firmware_updated = False
-    debugger_attached = False
 
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--no_firmware_update', action='store_true',
                         help='Disable automatic firmware download')
-    parser.add_argument('--debugger_attached', action='store_true',
-                        help='Disable automatic program start after flashing')
 
     args = parser.parse_args()
 
     if not args.no_firmware_update:
         firmware_updated = download_microSWIFT_firmware()
-    debugger_attached = args.debugger_attached
 
     app = QtWidgets.QApplication(sys.argv)
 
-    programmer = ProgrammerApp(args.no_firmware_update, firmware_updated, debugger_attached)
+    programmer = ProgrammerApp(args.no_firmware_update, firmware_updated)
     programmer.show()
     sys.exit(app.exec())
 
