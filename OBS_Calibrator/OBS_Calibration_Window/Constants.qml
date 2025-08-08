@@ -1,27 +1,25 @@
 pragma Singleton
 import QtQuick
-import QtQuick.Studio.Application
 
 QtObject {
     readonly property int width: 800
     readonly property int height: 800
 
-    property string relativeFontDirectory: "fonts"
+    readonly property string relativeFontDirectory: "fonts"
 
-    /* Edit this comment to add your custom font */
+    // Replace with a default font or configure via Python
+    readonly property string defaultFontFamily: "PT Mono"
+    readonly property int defaultFontSize: 14
+
     readonly property font font: Qt.font({
-                                             family: Qt.application.font.family,
-                                             pixelSize: Qt.application.font.pixelSize
-                                         })
+        family: defaultFontFamily,
+        pixelSize: defaultFontSize
+    })
+
     readonly property font largeFont: Qt.font({
-                                                  family: Qt.application.font.family,
-                                                  pixelSize: Qt.application.font.pixelSize * 1.6
-                                              })
+        family: defaultFontFamily,
+        pixelSize: defaultFontSize * 1.6
+    })
 
     readonly property color backgroundColor: "#EAEAEA"
-
-
-    property StudioApplication application: StudioApplication {
-        fontPath: Qt.resolvedUrl("../OBS_Calibration_WindowContent/" + relativeFontDirectory)
-    }
 }

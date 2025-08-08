@@ -133,6 +133,7 @@ Frame {
             down.indicator: Item {}
         }
 
+
         SpinBox {
             id: stdevSpinBox
             objectName: "stdevSpinBox"

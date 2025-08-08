@@ -17,7 +17,6 @@ class CalibrationPlotItem(QObject):
         self._equation = ""
         self._r2 = ""
 
-    @Slot('QVariantList', 'QVariantList')
     def generate_plot(self, x_values, y_values):
         x = np.array(x_values)
         y = np.array(y_values)

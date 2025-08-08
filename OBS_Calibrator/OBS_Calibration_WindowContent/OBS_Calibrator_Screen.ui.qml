@@ -98,7 +98,7 @@ Rectangle {
         width: 200
         height: 32
         text: qsTr("Find Equation")
-        enabled: true
+        enabled: false
         layer.enabled: false
         font.family: "PT Mono"
     }

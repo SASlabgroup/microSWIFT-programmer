@@ -3,7 +3,7 @@ import random
 # import adafruit_vcnl4010
 import statistics
 import time
-from PySide6.QtCore import Signal, QThread
+from PySide6.QtCore import Signal, QThread, Slot
 
 
 class SensorThread(QThread):
@@ -48,6 +48,7 @@ class SensorThread(QThread):
         self.finished.emit(mean, stdev)
 
 
+    @Slot()
     def stop(self):
         self._running = False
 
