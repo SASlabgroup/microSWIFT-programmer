@@ -5,6 +5,8 @@ import statistics
 import time
 from PySide6.QtCore import Signal, QThread, Slot
 
+DELAY_TIME = 2 # 999
+
 
 class SensorThread(QThread):
     proximity_read = Signal(int)
@@ -30,7 +32,7 @@ class SensorThread(QThread):
                 samples.append(proximity)
                 self.proximity_read.emit(proximity)
                 if i < (self.sample_count - 1):
-                    for i in range(999):
+                    for i in range(DELAY_TIME):
                         if not self._running:
                             break
                         else:

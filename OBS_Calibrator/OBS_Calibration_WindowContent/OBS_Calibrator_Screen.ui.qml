@@ -237,14 +237,18 @@ Rectangle {
         fileMode: FileDialog.SaveFile
         nameFilters: ["CSV files (*.csv)"]
         defaultSuffix: "csv"
+        folder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
 
         onAccepted: {
-            controller.saveSampleData(saveDialog.currentFile)
+            if (currentFile) {
+                controller.saveSampleData(currentFile)
+            } else {
+                console.warn("Save dialog accepted but no file selected.")
+            }
         }
 
-
         onRejected: {
-            console.log("Save dialog was canceled.")
+            console.log("Save dialog was canceled by the user.")
         }
     }
 }

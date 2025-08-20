@@ -1,39 +1,35 @@
-import QtQuick
-import QtQuick.Controls
-import QtQuick.Layouts
-import QtQuick.Window
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+import QtQuick.Layouts 1.15
 
-Item {
-    width: 400
-    height: 400
 
-    Column {
-        anchors.centerIn: parent
-        spacing: 12
+Dialog {
+    id: calibrationPlotDialog
+    modal: true
+    width: 600
+    height: 500
+    title: "Calibration Curve"
+
+    // Property to receive image path from Python
+    property string imagePath: ""
+
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 10
+        spacing: 10
 
         Image {
             id: plotImage
-            width: 360
-            height: 240
-            source: "image://calibrationPlot"
+            source: imagePath !== "" ? "file://" + imagePath : ""
             fillMode: Image.PreserveAspectFit
+            Layout.fillWidth: true
+            Layout.fillHeight: true
         }
 
-        Label {
-            id: equationLabel
-            text: calibrationPlot.equation
-            font.family: "PT Mono"
-            horizontalAlignment: Text.AlignHCenter
-            width: parent.width
-        }
-
-        Label {
-            id: r2Label
-            text: calibrationPlot.r2
-            font.family: "PT Mono"
-            horizontalAlignment: Text.AlignHCenter
-            width: parent.width
+        Button {
+            text: "Close"
+            Layout.alignment: Qt.AlignHCenter
+            onClicked: calibrationPlotDialog.close()
         }
     }
 }
-

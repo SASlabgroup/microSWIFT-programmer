@@ -4,27 +4,43 @@ from pathlib import Path
 import sys
 import os
 import csv
+import matplotlib.pyplot as plt
+import numpy as np
 
-from PySide6.QtCore import QObject, QUrl, Slot
+from PySide6.QtCore import QObject, QUrl, Slot, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
-from CalibrationPlotItem import CalibrationPlotItem
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+
 from Sensor_Thread import SensorThread
 from Python.autogen.settings import url, import_paths
 
 os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"
 
 class UIController(QObject):
-    def __init__(self, root_object, sensor_thread):
+    plotReady = Signal(str)
+    requestSaveFile = Signal()  # Signal to trigger QML FileDialog
+    _pending_plot_data = None   # Store data temporarily before user picks path
 
+    def __init__(self, sensor_thread):
         super().__init__()
-        self.root = root_object
+        self.ntu_components = None
+        self.serialNumberTextField = None
+        self.find_equation_button = None
+        self.saveSampleDataButton = None
+        self.num_calibration_points_spinbox = None
+        self.root = None
         self.sensor_thread = sensor_thread
-        self.plot = CalibrationPlotItem()
         self.active_component_index = 1
         self.num_points = 1
         self.cal_point_complete = [False] * 10
+        self.cal_points = [[0.0, 0.0] for _ in range(10)]
+
+    def setup(self, root_object):
+        """Call this after QML has loaded to bind UI objects."""
+        self.root = root_object
 
         # Grab references to all the things we're going to need often
         self.ntu_components = [self.root.findChild(QObject, f"ntuComponent{i}") for i in range(10)]
@@ -46,10 +62,11 @@ class UIController(QObject):
 
         self.sensor_thread.proximity_read.connect(self.update_samples_text_area)
         self.sensor_thread.finished.connect(self.handle_sensor_finished)
-        self.find_equation_button.clicked.connect(self.generate_plot)
+        self.find_equation_button.clicked.connect(self.compute_calibration_equation)
 
         # Connect signals
         self.num_calibration_points_spinbox.valueChanged.connect(self.update_ntu_components)
+
 
     def enable_sampling_controls(self, component):
         for name in ["startButton", "numSamplesSpinBox", "ntuConcentrationSpinBox"]:
@@ -65,6 +82,7 @@ class UIController(QObject):
         component = self.ntu_components[self.active_component_index]
         self.enable_sampling_controls(component)
 
+        ntu_concentration = component.findChild(QObject, "ntuConcentrationSpinBox")
         average_spinbox = component.findChild(QObject, "averageSpinBox")
         stdev_spinbox = component.findChild(QObject, "stdevSpinBox")
 
@@ -79,6 +97,7 @@ class UIController(QObject):
             else:
                 stdev_spinbox.setProperty("textColor", "white")
                 self.cal_point_complete[self.active_component_index] = True
+                self.cal_points[self.active_component_index] = [mean, ntu_concentration.property("value")]
                 self.checkFindEquation()
 
         for i in range(self.root.findChild(QObject, "numCalibrationPointsSpinBox").property("value")):
@@ -227,6 +246,44 @@ class UIController(QObject):
 
             self.find_equation_button.setProperty("enabled", True)
 
+    def compute_calibration_equation(self):
+        # Only use the number of points specified
+        self.cal_points = self.cal_points[:self.num_points]
+
+        x = np.array([pt[0] for pt in self.cal_points]).reshape(-1, 1)
+        y = np.array([pt[1] for pt in self.cal_points])
+
+        model = LinearRegression()
+        model.fit(x, y)
+
+        y_pred = model.predict(x)
+        r_squared = r2_score(y, y_pred)
+
+        # Store all info temporarily
+        self._pending_plot_data = (x, y, model.coef_[0], model.intercept_, r_squared)
+
+        # Ask QML to show a save dialog
+        self.requestSaveFile.emit()
+
+    def plot_calibration_curve(self, x, y, slope, intercept, r2, save_path):
+        y_pred = slope * x + intercept
+        plt.figure(figsize=(8, 6))
+        plt.scatter(x, y, color='blue', label='Calibration Points')
+        plt.plot(x, y_pred, color='red', label='Regression Line')
+        plt.xlabel('Sensor Reading')
+        plt.ylabel('Measured Value')
+        plt.title('Sensor Calibration Curve')
+        plt.legend()
+
+        equation_text = f"y = {slope:.2f}x + {intercept:.2f}\nR² = {r2:.4f}"
+        plt.text(0.05, 0.95, equation_text, transform=plt.gca().transAxes,
+                 fontsize=12, verticalalignment='top', bbox=dict(facecolor='white', alpha=0.5))
+
+        plt.savefig(save_path)
+        plt.close()
+
+        self.plotReady.emit(save_path)
+
     @Slot()
     def generate_plot(self):
         pass
@@ -236,24 +293,26 @@ if __name__ == '__main__':
     engine = QQmlApplicationEngine()
 
     app_dir = Path(__file__).parent
-
     engine.addImportPath(os.fspath(app_dir))
     for path in import_paths:
         engine.addImportPath(os.fspath(app_dir / path))
 
-    engine.load(os.fspath(app_dir/url))
+    sensor_thread = SensorThread()
+    controller = UIController(sensor_thread)
+
+    # Expose controller BEFORE QML loads
+    engine.rootContext().setContextProperty("uiController", controller)
+
+    # Only load ONE entry QML file
+    engine.load(QUrl("OBS_Calibrator/OBS_Calibration_WindowContent/App.qml"))
+    # or:
+    # engine.load(QUrl("OBS_Calibrator/OBS_Calibration_WindowContent/OBS_Calibrator_Screen.ui.qml"))
+
     if not engine.rootObjects():
         sys.exit(-1)
 
     root_object = engine.rootObjects()[0]
+    controller.setup(root_object)
 
-    sensor_thread = SensorThread()
-    controller = UIController(root_object, sensor_thread)  # Your controller class instance
-    engine.rootContext().setContextProperty("controller", controller)
-
-    engine.load(QUrl("OBS_Calibrator/OBS_Calibration_WindowContent/OBS_Calibrator_Screen.ui.qml"))
-
-    # Stop the thread when the app is about to quit
     app.aboutToQuit.connect(sensor_thread.stop)
-
     sys.exit(app.exec())
