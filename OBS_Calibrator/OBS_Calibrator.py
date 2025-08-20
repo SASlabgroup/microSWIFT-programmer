@@ -6,6 +6,7 @@ import os
 import csv
 import matplotlib.pyplot as plt
 import numpy as np
+import shutil
 
 from PySide6.QtCore import QObject, QUrl, Slot, Signal
 from PySide6.QtGui import QGuiApplication
@@ -262,7 +263,7 @@ class UIController(QObject):
         # Store all info temporarily
         self._pending_plot_data = (x, y, model.coef_[0], model.intercept_, r_squared)
 
-        # Ask QML to show a save dialog
+        # Ask QML to show a save dialog for the plot
         self.requestSaveFile.emit()
 
     def plot_calibration_curve(self, x, y, slope, intercept, r2, save_path):
@@ -284,9 +285,34 @@ class UIController(QObject):
 
         self.plotReady.emit(save_path)
 
-    @Slot()
-    def generate_plot(self):
-        pass
+    @Slot(str)
+    def saveCalibrationPlot(self, file_url):
+        if not self._pending_plot_data:
+            print("No pending plot data.")
+            return
+
+        x, y, slope, intercept, r2 = self._pending_plot_data
+
+        # Strip "file://" if it exists
+        if file_url.startswith("file://"):
+            file_path = file_url[7:]
+        else:
+            file_path = file_url
+
+        # Expand user path (in case it has ~)
+        file_path = os.path.expanduser(file_path)
+
+        self.plot_calibration_curve(x, y, slope, intercept, r2, file_path)
+        self._pending_plot_data = None
+
+    @Slot(str, str)
+    def copy_file_to_destination(self, src, dest):
+        try:
+            shutil.copyfile(src, dest)
+            print(f"Plot saved to {dest}")
+        except Exception as e:
+            print(f"Error saving plot: {e}")
+
 
 if __name__ == '__main__':
     app = QGuiApplication(sys.argv)

@@ -232,23 +232,20 @@ Rectangle {
     }
 
     FileDialog {
-        id: saveDialog
-        title: "Save Sample Data"
+        id: plotSaveDialog
+        title: "Save Calibration Plot"
         fileMode: FileDialog.SaveFile
-        nameFilters: ["CSV files (*.csv)"]
-        defaultSuffix: "csv"
+        nameFilters: ["PNG files (*.png)"]
+        defaultSuffix: "png"
         folder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
 
         onAccepted: {
             if (currentFile) {
-                controller.saveSampleData(currentFile)
-            } else {
-                console.warn("Save dialog accepted but no file selected.")
+                uiController.saveCalibrationPlot(currentFile)
             }
         }
-
-        onRejected: {
-            console.log("Save dialog was canceled by the user.")
-        }
     }
+
+    // expose it as a property
+    property alias plotSaveDialog: plotSaveDialog
 }
