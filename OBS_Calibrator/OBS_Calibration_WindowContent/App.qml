@@ -21,9 +21,9 @@ Window {
 
     Connections {
         target: uiController
-        function onRequestSaveFile() {
-            mainScreen.plotSaveDialog.open()
+        function onPlotReady(path) {
+            calibrationPlotDialog.plotSource = "file://" + path
+            calibrationPlotDialog.open()
         }
     }
-
 }

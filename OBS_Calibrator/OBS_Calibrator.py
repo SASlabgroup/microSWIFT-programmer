@@ -1,4 +1,4 @@
-
+import tempfile
 from pathlib import Path
 
 import sys
@@ -247,6 +247,8 @@ class UIController(QObject):
 
             self.find_equation_button.setProperty("enabled", True)
 
+    import tempfile
+
     def compute_calibration_equation(self):
         # Only use the number of points specified
         self.cal_points = self.cal_points[:self.num_points]
@@ -260,11 +262,14 @@ class UIController(QObject):
         y_pred = model.predict(x)
         r_squared = r2_score(y, y_pred)
 
-        # Store all info temporarily
         self._pending_plot_data = (x, y, model.coef_[0], model.intercept_, r_squared)
 
-        # Ask QML to show a save dialog for the plot
-        self.requestSaveFile.emit()
+        # Save plot to a temporary file so QML can display it
+        temp_path = os.path.join(tempfile.gettempdir(), "calibration_plot.png")
+        self.plot_calibration_curve(x, y, model.coef_[0], model.intercept_, r_squared, temp_path)
+
+        # Tell QML to open the dialog and show this temp file
+        self.plotReady.emit(temp_path)
 
     def plot_calibration_curve(self, x, y, slope, intercept, r2, save_path):
         y_pred = slope * x + intercept

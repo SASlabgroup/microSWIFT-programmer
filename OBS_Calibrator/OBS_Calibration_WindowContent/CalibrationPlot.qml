@@ -1,41 +1,43 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
-import QtQuick.Layouts 1.15
+import Qt.labs.platform 1.1  // for FileDialog
 
 Popup {
-    id: calibrationPlotDialog
+    id: calibrationDialog
+    property alias plotSource: plotImage.source
     modal: true
     focus: true
     width: 600
     height: 500
-    visible: false
 
-    property string imagePath: ""
-
-    Rectangle {
+    Column {
         anchors.fill: parent
-        color: "#1b1a1a"
-        border.color: "gray"
-        radius: 8
+        spacing: 10
+        padding: 10
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 10
-            spacing: 10
+        Image {
+            id: plotImage
+            anchors.horizontalCenter: parent.horizontalCenter
+            fillMode: Image.PreserveAspectFit
+            width: parent.width
+            height: parent.height - saveButton.height - 20
+        }
 
-            Image {
-                id: plotImage
-                source: imagePath !== "" ? "file://" + imagePath : ""
-                fillMode: Image.PreserveAspectFit
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-            }
+        Button {
+            id: saveButton
+            text: "Save Plot"
+            anchors.horizontalCenter: parent.horizontalCenter
+            onClicked: plotSaveDialog.open()
+        }
+    }
 
-            Button {
-                text: "Close"
-                Layout.alignment: Qt.AlignHCenter
-                onClicked: calibrationPlotDialog.close()
-            }
+    FileDialog {
+        id: plotSaveDialog
+        title: "Save Calibration Plot"
+        nameFilters: ["PNG files (*.png)"]
+        fileMode: FileDialog.SaveFile
+        onAccepted: {
+            uiController.saveCalibrationPlot(file)
         }
     }
 }

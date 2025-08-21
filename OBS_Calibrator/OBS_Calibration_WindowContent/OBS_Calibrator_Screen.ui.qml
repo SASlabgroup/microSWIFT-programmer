@@ -231,21 +231,20 @@ Rectangle {
         helpButton.onClicked.connect(() => helpPopup.open())
     }
 
+
     FileDialog {
-        id: plotSaveDialog
-        title: "Save Calibration Plot"
+        id: saveDialog
+        title: "Save Sample Data"
         fileMode: FileDialog.SaveFile
-        nameFilters: ["PNG files (*.png)"]
-        defaultSuffix: "png"
-        folder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
+        nameFilters: ["CSV files (*.csv)", "All files (*)"]
 
         onAccepted: {
-            if (currentFile) {
-                uiController.saveCalibrationPlot(currentFile)
-            }
+            console.log("Selected file:", fileUrl)
+            pythonInterface.saveFile(fileUrl) // call Python
+        }
+
+        onRejected: {
+            console.log("Save canceled")
         }
     }
-
-    // expose it as a property
-    property alias plotSaveDialog: plotSaveDialog
 }
