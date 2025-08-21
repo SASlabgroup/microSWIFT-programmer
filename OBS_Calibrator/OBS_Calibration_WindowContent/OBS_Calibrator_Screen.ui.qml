@@ -1,10 +1,8 @@
-
 import QtQuick
 import QtQuick.Controls
 import OBS_Calibration_Window
 import QtQuick.Dialogs
 import Qt.labs.platform 1.1
-
 
 Rectangle {
     id: rectangle
@@ -12,6 +10,8 @@ Rectangle {
     height: 820
     color: "#1b1a1a"
 
+    // Expose the serial number as a property for external access
+    property string serialNumber: serialNumberTextField.text
 
     Grid {
         id: ntuComponentGrid
@@ -30,64 +30,17 @@ Rectangle {
         bottomPadding: 10
         topPadding: 10
 
-        NTUConcentrationComponent {
-            id: ntuComponent0
-            objectName: "ntuComponent0"
-        }
-
-        NTUConcentrationComponent {
-            id: ntuComponent1
-            enabled: false
-            objectName: "ntuComponent1"
-        }
-
-        NTUConcentrationComponent {
-            id: ntuComponent2
-            enabled: false
-            objectName: "ntuComponent2"
-        }
-
-        NTUConcentrationComponent {
-            id: ntuComponent3
-            enabled: false
-            objectName: "ntuComponent3"
-        }
-
-        NTUConcentrationComponent {
-            id: ntuComponent4
-            enabled: false
-            objectName: "ntuComponent4"
-        }
-
-        NTUConcentrationComponent {
-            id: ntuComponent5
-            enabled: false
-            objectName: "ntuComponent5"
-        }
-
-        NTUConcentrationComponent {
-            id: ntuComponent6
-            enabled: false
-            objectName: "ntuComponent6"
-        }
-
-        NTUConcentrationComponent {
-            id: ntuComponent7
-            enabled: false
-            objectName: "ntuComponent7"
-        }
-
-        NTUConcentrationComponent {
-            id: ntuComponent8
-            enabled: false
-            objectName: "ntuComponent8"
-        }
-
-        NTUConcentrationComponent {
-            id: ntuComponent9
-            enabled: false
-            objectName: "ntuComponent9"
-        }
+        // NTU Components (0–9)
+        NTUConcentrationComponent { id: ntuComponent0; objectName: "ntuComponent0" }
+        NTUConcentrationComponent { id: ntuComponent1; enabled: false; objectName: "ntuComponent1" }
+        NTUConcentrationComponent { id: ntuComponent2; enabled: false; objectName: "ntuComponent2" }
+        NTUConcentrationComponent { id: ntuComponent3; enabled: false; objectName: "ntuComponent3" }
+        NTUConcentrationComponent { id: ntuComponent4; enabled: false; objectName: "ntuComponent4" }
+        NTUConcentrationComponent { id: ntuComponent5; enabled: false; objectName: "ntuComponent5" }
+        NTUConcentrationComponent { id: ntuComponent6; enabled: false; objectName: "ntuComponent6" }
+        NTUConcentrationComponent { id: ntuComponent7; enabled: false; objectName: "ntuComponent7" }
+        NTUConcentrationComponent { id: ntuComponent8; enabled: false; objectName: "ntuComponent8" }
+        NTUConcentrationComponent { id: ntuComponent9; enabled: false; objectName: "ntuComponent9" }
     }
 
     Button {
@@ -99,7 +52,6 @@ Rectangle {
         height: 32
         text: qsTr("Find Equation")
         enabled: false
-        layer.enabled: false
         font.family: "PT Mono"
     }
 
@@ -115,10 +67,11 @@ Rectangle {
         font.family: "PT Mono"
 
         onClicked: {
-            let serial = serialNumberTextField.text;
-            let filename = "calibration_sample_data_sn_" + serial + ".csv";
-
+            // Get downloads path
             let downloadsPath = StandardPaths.standardLocations(StandardPaths.DownloadLocation)[0];
+
+            // Prepopulate filename using serial number
+            let filename = "calibration_sample_data_sn_" + serialNumber + ".csv";
             saveDialog.currentFile = downloadsPath + "/" + filename;
 
             saveDialog.open();
@@ -134,13 +87,15 @@ Rectangle {
         height: 30
         text: "Help Me!"
         font.family: "PT Mono"
+        onClicked: helpPopup.open()
     }
 
     Label {
-        id: serialNumberLabel
-        x: 342
-        y: 763
-        text: qsTr("Serial Number")
+        id: numCalibrationPointsLabel
+        objectName: "numCalibrationPointsLabel"
+        x: 395
+        y: 14
+        text: qsTr("Number of Calibration Points")
         font.family: "PT Mono"
     }
 
@@ -154,11 +109,8 @@ Rectangle {
         text: "0"
         maximumLength: 10
         font.family: "PT Mono"
-        placeholderText: qsTr("Text Field")
-
-        validator: RegularExpressionValidator {
-            regularExpression: /^[a-zA-Z0-9]*$/
-        }
+        placeholderText: qsTr("Serial Number")
+        validator: RegularExpressionValidator { regularExpression: /^[a-zA-Z0-9]*$/ }
     }
 
     SpinBox {
@@ -172,21 +124,6 @@ Rectangle {
         to: 10
         from: 1
     }
-
-    Label {
-        id: numCalibrationPointsLabel
-        objectName: "numCalibrationPointsLabel"
-        x: 395
-        y: 14
-        text: qsTr("Number of Calibration Points")
-        font.family: "PT Mono"
-    }
-
-    states: [
-        State {
-            name: "clicked"
-        }
-    ]
 
     Popup {
         id: helpPopup
@@ -227,11 +164,6 @@ Rectangle {
         }
     }
 
-    Component.onCompleted: {
-        helpButton.onClicked.connect(() => helpPopup.open())
-    }
-
-
     FileDialog {
         id: saveDialog
         title: "Save Sample Data"
@@ -239,8 +171,16 @@ Rectangle {
         nameFilters: ["CSV files (*.csv)", "All files (*)"]
 
         onAccepted: {
-            console.log("Selected file:", fileUrl)
-            pythonInterface.saveFile(fileUrl) // call Python
+            let path = saveDialog.fileUrl && saveDialog.fileUrl !== ""
+                       ? saveDialog.fileUrl
+                       : saveDialog.currentFile;
+
+            if (path && path !== "") {
+                console.log("Selected file:", path)
+                uiController.saveSampleData(path)
+            } else {
+                console.log("No file selected")
+            }
         }
 
         onRejected: {
