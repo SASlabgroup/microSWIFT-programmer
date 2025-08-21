@@ -1,6 +1,8 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
-import Qt.labs.platform 1.1  // for FileDialog
+import Qt.labs.platform 1.1  // For FileDialog
+import QtQuick.Layouts 1.15
+import QtQuick.Window 2.15
 
 Popup {
     id: calibrationDialog
@@ -27,7 +29,12 @@ Popup {
             id: saveButton
             text: "Save Plot"
             anchors.horizontalCenter: parent.horizontalCenter
-            onClicked: plotSaveDialog.open()
+            onClicked: {
+                // Set default filename in user's Downloads folder
+                let downloadsPath = StandardPaths.standardLocations(StandardPaths.DownloadLocation)[0];
+                plotSaveDialog.currentFile = downloadsPath + "/calibration_plot.png";
+                plotSaveDialog.open();
+            }
         }
     }
 
@@ -36,8 +43,24 @@ Popup {
         title: "Save Calibration Plot"
         nameFilters: ["PNG files (*.png)"]
         fileMode: FileDialog.SaveFile
+
         onAccepted: {
-            uiController.saveCalibrationPlot(file)
+            // Use fileUrl if defined, otherwise fallback to currentFile
+            let path = plotSaveDialog.fileUrl && plotSaveDialog.fileUrl !== ""
+                       ? plotSaveDialog.fileUrl
+                       : plotSaveDialog.currentFile;
+
+            if (path && path !== "") {
+                console.log("Selected file:", path)
+                uiController.saveCalibrationPlot(path)
+            } else {
+                console.log("No file selected")
+            }
+        }
+
+        onRejected: {
+            console.log("Save canceled")
         }
     }
+
 }

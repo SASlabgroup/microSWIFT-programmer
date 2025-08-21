@@ -4,6 +4,8 @@ from pathlib import Path
 import sys
 import os
 import csv
+import matplotlib
+matplotlib.use("Agg")  # Non-GUI backend for safe offscreen plotting
 import matplotlib.pyplot as plt
 import numpy as np
 import shutil
@@ -11,6 +13,8 @@ import shutil
 from PySide6.QtCore import QObject, QUrl, Slot, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
@@ -262,9 +266,10 @@ class UIController(QObject):
         y_pred = model.predict(x)
         r_squared = r2_score(y, y_pred)
 
+        # Store plot data so it can be saved later
         self._pending_plot_data = (x, y, model.coef_[0], model.intercept_, r_squared)
 
-        # Save plot to a temporary file so QML can display it
+        # Save plot to a temporary file for QML to display
         temp_path = os.path.join(tempfile.gettempdir(), "calibration_plot.png")
         self.plot_calibration_curve(x, y, model.coef_[0], model.intercept_, r_squared, temp_path)
 
@@ -272,23 +277,30 @@ class UIController(QObject):
         self.plotReady.emit(temp_path)
 
     def plot_calibration_curve(self, x, y, slope, intercept, r2, save_path):
+        # Offscreen figure
+        fig = Figure(figsize=(8, 6))
+        canvas = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+
+        # Scatter points and regression line
+        ax.scatter(x, y, color='blue', label='Calibration Points')
         y_pred = slope * x + intercept
-        plt.figure(figsize=(8, 6))
-        plt.scatter(x, y, color='blue', label='Calibration Points')
-        plt.plot(x, y_pred, color='red', label='Regression Line')
-        plt.xlabel('Sensor Reading')
-        plt.ylabel('Measured Value')
-        plt.title('Sensor Calibration Curve')
-        plt.legend()
+        ax.plot(x, y_pred, color='red', label='Regression Line')
 
+        # Labels and title
+        ax.set_xlabel('Sensor Reading')
+        ax.set_ylabel('Measured Value')
+        ax.set_title('Sensor Calibration Curve')
+        ax.legend()
+
+        # Equation text overlay
         equation_text = f"y = {slope:.2f}x + {intercept:.2f}\nR² = {r2:.4f}"
-        plt.text(0.05, 0.95, equation_text, transform=plt.gca().transAxes,
-                 fontsize=12, verticalalignment='top', bbox=dict(facecolor='white', alpha=0.5))
+        ax.text(0.05, 0.95, equation_text, transform=ax.transAxes,
+                fontsize=12, verticalalignment='top',
+                bbox=dict(facecolor='white', alpha=0.5))
 
-        plt.savefig(save_path)
-        plt.close()
-
-        self.plotReady.emit(save_path)
+        # Save as PNG
+        canvas.print_png(save_path)
 
     @Slot(str)
     def saveCalibrationPlot(self, file_url):
@@ -296,18 +308,19 @@ class UIController(QObject):
             print("No pending plot data.")
             return
 
+        if not file_url or not file_url.startswith("file://"):
+            print("Invalid file URL:", file_url)
+            return
+
         x, y, slope, intercept, r2 = self._pending_plot_data
+        file_path = os.path.expanduser(file_url[7:])  # strip file://
 
-        # Strip "file://" if it exists
-        if file_url.startswith("file://"):
-            file_path = file_url[7:]
-        else:
-            file_path = file_url
+        try:
+            self.plot_calibration_curve(x, y, slope, intercept, r2, file_path)
+            print(f"Calibration plot saved to {file_path}")
+        except Exception as e:
+            print(f"Error saving calibration plot: {e}")
 
-        # Expand user path (in case it has ~)
-        file_path = os.path.expanduser(file_path)
-
-        self.plot_calibration_curve(x, y, slope, intercept, r2, file_path)
         self._pending_plot_data = None
 
     @Slot(str, str)
