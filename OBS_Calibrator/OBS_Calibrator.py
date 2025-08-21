@@ -72,6 +72,43 @@ class UIController(QObject):
         # Connect signals
         self.num_calibration_points_spinbox.valueChanged.connect(self.update_ntu_components)
 
+    @Slot()
+    @Slot()
+    def resetApplicationState(self):
+        """Reset the app to its initial state after closing the plot popup."""
+        for i, component in enumerate(self.ntu_components):
+            if not component:
+                continue
+
+            # Reset sampling-related spinboxes
+            num_samples_spinbox = component.findChild(QObject, "numSamplesSpinBox")
+            if num_samples_spinbox:
+                num_samples_spinbox.setProperty("value", 1)
+
+            ntu_spinbox = component.findChild(QObject, "ntuConcentrationSpinBox")
+            if ntu_spinbox:
+                ntu_spinbox.setProperty("value", 0)
+
+            # Reset text fields, mean, stdev, internal tracking
+            self.reset_component(i)
+
+        # Reset spinboxes outside NTU components
+        if self.num_calibration_points_spinbox:
+            self.num_calibration_points_spinbox.setProperty("value", 1)
+            self.num_calibration_points_spinbox.setProperty("enabled", True)
+
+        # Reset serial number field
+        if self.serialNumberTextField:
+            self.serialNumberTextField.setProperty("text", "0")
+
+        # Reset buttons
+        if self.find_equation_button:
+            self.find_equation_button.setProperty("enabled", False)
+        if self.saveSampleDataButton:
+            self.saveSampleDataButton.setProperty("enabled", True)
+
+        # Clear pending plot data
+        self._pending_plot_data = None
 
     def enable_sampling_controls(self, component):
         for name in ["startButton", "numSamplesSpinBox", "ntuConcentrationSpinBox"]:

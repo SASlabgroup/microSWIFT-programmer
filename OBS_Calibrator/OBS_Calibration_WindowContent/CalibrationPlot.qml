@@ -13,6 +13,11 @@ Popup {
     height: 500
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
+    onClosed: {
+        // Call Python method to reset app state
+        uiController.resetApplicationState()
+    }
+
     Column {
         anchors.fill: parent
         spacing: 10
