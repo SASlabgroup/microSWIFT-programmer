@@ -22,18 +22,26 @@ Popup {
             anchors.horizontalCenter: parent.horizontalCenter
             fillMode: Image.PreserveAspectFit
             width: parent.width
-            height: parent.height - saveButton.height - 20
+            height: parent.height - saveButton.height - 40  // leave space for buttons
         }
 
-        Button {
-            id: saveButton
-            text: "Save Plot"
+        Row {
+            spacing: 20
             anchors.horizontalCenter: parent.horizontalCenter
-            onClicked: {
-                // Set default filename in user's Downloads folder
-                let downloadsPath = StandardPaths.standardLocations(StandardPaths.DownloadLocation)[0];
-                plotSaveDialog.currentFile = downloadsPath + "/calibration_plot.png";
-                plotSaveDialog.open();
+
+            Button {
+                id: saveButton
+                text: "Save Plot"
+                onClicked: {
+                    let downloadsPath = StandardPaths.standardLocations(StandardPaths.DownloadLocation)[0];
+                    plotSaveDialog.currentFile = downloadsPath + "/calibration_plot.png";
+                    plotSaveDialog.open();
+                }
+            }
+
+            Button {
+                text: "Close"
+                onClicked: calibrationDialog.close()
             }
         }
     }
@@ -45,7 +53,6 @@ Popup {
         fileMode: FileDialog.SaveFile
 
         onAccepted: {
-            // Use fileUrl if defined, otherwise fallback to currentFile
             let path = plotSaveDialog.fileUrl && plotSaveDialog.fileUrl !== ""
                        ? plotSaveDialog.fileUrl
                        : plotSaveDialog.currentFile;
@@ -62,5 +69,5 @@ Popup {
             console.log("Save canceled")
         }
     }
-
 }
+
