@@ -11,8 +11,7 @@ A professional PySide6-based application for calibrating Optical Backscatter (OB
 - **Automatic simulation mode** when hardware is not available
 - **Data export** to CSV format
 - **Calibration plot generation** and export
-- **Cross-platform support** (Windows, macOS, Linux)
-- **Dark theme interface** for professional use
+- **Cross-platform support** (Windows, macOS)
 
 ## System Requirements
 
@@ -23,7 +22,6 @@ A professional PySide6-based application for calibrating Optical Backscatter (OB
 ### Supported Platforms
 - **Windows 10/11** (x86-64)
 - **macOS** (Intel and Apple Silicon)
-- **Linux** (x86-64) - basic support
 
 ### Hardware (Optional)
 - **VCNL4010 proximity sensor** via I2C
@@ -115,7 +113,7 @@ cd OBS_Calibrator
 ## ✅ Quick Test
 
 After installation, the application should:
-1. Open with a dark theme interface
+1. Open with a professional interface
 2. Show "Hardware connected" or "No Device!" in the serial number field
 3. Allow you to configure calibration points
 4. Let you start sensor readings (real or simulated)
@@ -140,7 +138,7 @@ After installation, the application should:
 - **Sample Collection**: Collect multiple samples per point with automatic statistics
 - **Quality Control**: Standard deviation monitoring with visual indicators
 - **Data Export**: Save raw data and calibration curves
-- **Professional UI**: Dark theme optimized for field use
+- **Professional UI**: Optimized interface for field use
 
 ## Troubleshooting
 
@@ -153,7 +151,7 @@ After installation, the application should:
 
 **Hardware not detected:**
 - Verify USB connection and MCP2221 drivers
-- Check device permissions (Linux/macOS)
+- Check device permissions (macOS may require admin access)
 - Application will run in simulation mode if hardware unavailable
 
 **Application won't start:**
@@ -161,17 +159,13 @@ After installation, the application should:
 - Ensure all dependencies are installed
 - Try running directly: `python OBS_Calibrator.py`
 
-**Dark theme not working:**
-- Theme is enforced at application level
-- Check console for Qt-related warnings
-- Try running with different Qt styles
-
 ### Getting Help
 
 1. Check console output for error messages
 2. Verify all installation steps were completed
-3. Ensure Python 3.13+ is installed and accessible
+3. Ensure Python 3.12+ is installed and accessible
 4. Try running in simulation mode first
+5. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed help
 
 ## Development
 
@@ -184,7 +178,11 @@ OBS_Calibrator/
 ├── qtquickcontrols2.conf     # Qt theme configuration
 ├── OBS_Calibration_WindowContent/  # QML user interface files
 ├── Python/autogen/           # Auto-generated settings
-└── scripts/                  # Installation and build scripts
+├── build_installer.*         # Path 1: Build standalone app
+├── install_dependencies.*    # Path 2: Install dependencies
+├── run_from_source.*         # Path 2: Run from source
+├── README.md                 # This file
+└── TROUBLESHOOTING.md        # Detailed troubleshooting guide
 ```
 
 ### Dependencies
@@ -205,4 +203,4 @@ OBS_Calibrator/
 
 ---
 
-**Note**: This application is designed for scientific and industrial use. Always verify calibration results against known standards before field deployment.
+**Note**: This application is designed for scientific use only. Always verify calibration results against known standards before field deployment.
