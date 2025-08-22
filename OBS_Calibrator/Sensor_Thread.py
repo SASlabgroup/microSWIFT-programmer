@@ -1,11 +1,11 @@
 import random
-# import board
-# import adafruit_vcnl4010
+import board
+import adafruit_vcnl4010
 import statistics
 import time
 from PySide6.QtCore import Signal, QThread, Slot
 
-DELAY_TIME = 2 # 999
+DELAY_TIME = 999
 
 
 class SensorThread(QThread):
@@ -20,15 +20,15 @@ class SensorThread(QThread):
         self.sample_count = count
     def run(self):
         self._running = True
-        # i2c = board.I2C()
-        # sensor = adafruit_vcnl4010.VCNL4010(i2c)
+        i2c = board.I2C()
+        sensor = adafruit_vcnl4010.VCNL4010(i2c)
         samples = []
         proximity = 0
 
         for i in range(self.sample_count):
             if self._running:
-                # proximity = sensor.proximity
-                proximity = random.randint(32750,32790)
+                proximity = sensor.proximity
+                # proximity = random.randint(32750,32790)
                 samples.append(proximity)
                 self.proximity_read.emit(proximity)
                 if i < (self.sample_count - 1):
