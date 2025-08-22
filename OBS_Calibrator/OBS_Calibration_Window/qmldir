@@ -2,3 +2,7 @@ module OBS_Calibration_Window
 singleton Constants 1.0 Constants.qml
 EventListSimulator 1.0 EventListSimulator.qml
 EventListModel 1.0 EventListModel.qml
+OBS_Calibrator_Screen 1.0 ../OBS_Calibration_WindowContent/OBS_Calibrator_Screen.ui.qml
+NTUConcentrationComponent 1.0 ../OBS_Calibration_WindowContent/NTUConcentrationComponent.ui.qml
+NTUConcentrationUnitFrame 1.0 ../OBS_Calibration_WindowContent/NTUConcentrationUnitFrame.ui.qml
+CalibrationPlot 1.0 ../OBS_Calibration_WindowContent/CalibrationPlot.qml

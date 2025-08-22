@@ -99,6 +99,14 @@ Rectangle {
         font.family: "PT Mono"
     }
 
+    Label {
+        id: serialNumberLabel
+        x: 342
+        y: 763
+        text: qsTr("Serial Number")
+        font.family: "PT Mono"
+    }
+
     TextField {
         id: serialNumberTextField
         objectName: "serialNumberTextField"

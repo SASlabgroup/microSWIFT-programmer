@@ -5,8 +5,6 @@ import sys
 import os
 import csv
 import matplotlib
-matplotlib.use("Agg")  # Non-GUI backend for safe offscreen plotting
-import matplotlib.pyplot as plt
 import numpy as np
 import shutil
 
@@ -22,12 +20,17 @@ from sklearn.metrics import r2_score
 from Sensor_Thread import SensorThread
 from Python.autogen.settings import url, import_paths
 
+matplotlib.use("Agg")  # Non-GUI backend for safe offscreen plotting
 os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"
+# Set the BLINKA_MCP2221 environment variable before any other imports
+os.environ["BLINKA_MCP2221"] = "1"
+
+
 
 class UIController(QObject):
     plotReady = Signal(str)
     requestSaveFile = Signal()  # Signal to trigger QML FileDialog
-    _pending_plot_data = None   # Store data temporarily before user picks path
+    _pending_plot_data = None  # Store data temporarily before user picks path
 
     def __init__(self, sensor_thread):
         super().__init__()
