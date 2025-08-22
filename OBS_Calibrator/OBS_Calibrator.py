@@ -34,8 +34,6 @@ matplotlib.use("Agg")  # Non-GUI backend for safe offscreen plotting
 os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"
 # Force dark theme regardless of system settings
 os.environ["QT_QUICK_CONTROLS_CONF"] = "qtquickcontrols2.conf"
-# Set the BLINKA_MCP2221 environment variable before any other imports
-os.environ["BLINKA_MCP2221"] = "1"
 
 
 
@@ -420,22 +418,49 @@ class UIController(QObject):
 if __name__ == '__main__':
     app = QGuiApplication(sys.argv)
     
-    # Force dark theme at the application level
+    # Force dark theme at the application level with improved cross-platform palette
     from PySide6.QtGui import QPalette, QColor
     dark_palette = QPalette()
-    dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))
-    dark_palette.setColor(QPalette.WindowText, QColor(255, 255, 255))
-    dark_palette.setColor(QPalette.Base, QColor(25, 25, 25))
-    dark_palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-    dark_palette.setColor(QPalette.ToolTipBase, QColor(0, 0, 0))
-    dark_palette.setColor(QPalette.ToolTipText, QColor(255, 255, 255))
-    dark_palette.setColor(QPalette.Text, QColor(255, 255, 255))
-    dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))
-    dark_palette.setColor(QPalette.ButtonText, QColor(255, 255, 255))
-    dark_palette.setColor(QPalette.BrightText, QColor(255, 0, 0))
-    dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
-    dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-    dark_palette.setColor(QPalette.HighlightedText, QColor(0, 0, 0))
+    
+    # Base colors for dark theme
+    window_color = QColor(53, 53, 53)
+    base_color = QColor(25, 25, 25) 
+    alt_base_color = QColor(53, 53, 53)
+    button_color = QColor(53, 53, 53)
+    text_color = QColor(255, 255, 255)
+    bright_text_color = QColor(255, 0, 0)
+    link_color = QColor(42, 130, 218)
+    highlight_color = QColor(42, 130, 218)
+    
+    # Set colors for all color groups (Active, Disabled, Inactive)
+    for color_group in [QPalette.Active, QPalette.Disabled, QPalette.Inactive]:
+        dark_palette.setColor(color_group, QPalette.Window, window_color)
+        dark_palette.setColor(color_group, QPalette.WindowText, text_color)
+        dark_palette.setColor(color_group, QPalette.Base, base_color)
+        dark_palette.setColor(color_group, QPalette.AlternateBase, alt_base_color)
+        dark_palette.setColor(color_group, QPalette.ToolTipBase, QColor(0, 0, 0))
+        dark_palette.setColor(color_group, QPalette.ToolTipText, text_color)
+        dark_palette.setColor(color_group, QPalette.Text, text_color)
+        dark_palette.setColor(color_group, QPalette.Button, button_color)
+        dark_palette.setColor(color_group, QPalette.ButtonText, text_color)
+        dark_palette.setColor(color_group, QPalette.BrightText, bright_text_color)
+        dark_palette.setColor(color_group, QPalette.Link, link_color)
+        dark_palette.setColor(color_group, QPalette.Highlight, highlight_color)
+        dark_palette.setColor(color_group, QPalette.HighlightedText, QColor(0, 0, 0))
+        
+        # Additional colors for better Windows compatibility
+        dark_palette.setColor(color_group, QPalette.Light, QColor(60, 60, 60))
+        dark_palette.setColor(color_group, QPalette.Midlight, QColor(56, 56, 56))
+        dark_palette.setColor(color_group, QPalette.Dark, QColor(35, 35, 35))
+        dark_palette.setColor(color_group, QPalette.Mid, QColor(40, 40, 40))
+        dark_palette.setColor(color_group, QPalette.Shadow, QColor(20, 20, 20))
+        
+    # Slightly different colors for disabled state
+    disabled_text = QColor(120, 120, 120)
+    dark_palette.setColor(QPalette.Disabled, QPalette.WindowText, disabled_text)
+    dark_palette.setColor(QPalette.Disabled, QPalette.Text, disabled_text)
+    dark_palette.setColor(QPalette.Disabled, QPalette.ButtonText, disabled_text)
+    
     app.setPalette(dark_palette)
     
     engine = QQmlApplicationEngine()

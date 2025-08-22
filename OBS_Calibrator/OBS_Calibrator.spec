@@ -60,13 +60,31 @@ hidden_imports = [
     'random',
     'time',
     
-    # Hardware libraries (optional, but include if available)
+    # Hardware libraries (Adafruit Blinka and MCP2221 support)
     'board',
     'adafruit_vcnl4010',
     'adafruit_circuitpython_vcnl4010',
     'adafruit_blinka',
+    'adafruit_blinka.board',
+    'adafruit_blinka.board.generic_linux',
+    'adafruit_blinka.board.macos',
+    'adafruit_blinka.board.windows',
+    'adafruit_blinka.microcontroller',
+    'adafruit_blinka.microcontroller.mcp2221',
+    'adafruit_platformdetect',
+    'adafruit_platformdetect.board',
+    'adafruit_platformdetect.chip',
+    'microcontroller',
+    'busio',
+    'digitalio',
+    'analogio',
+    'pulseio',
+    'pwmio',
+    'neopixel_write',
     'hidapi',
     'usb',
+    'hid',
+    'pyusb',
 ]
 
 # Collect all QML files
@@ -96,7 +114,7 @@ a = Analysis(
     hiddenimports=hidden_imports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[str(SPEC_DIR / 'pyi_rth_blinka.py')],
     excludes=[
         # Exclude only truly unnecessary modules
         'tkinter',

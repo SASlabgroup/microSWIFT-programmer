@@ -1,7 +1,11 @@
+import os
 import random
 import statistics
 import time
 from PySide6.QtCore import Signal, QThread, Slot
+
+# Set the BLINKA_MCP2221 environment variable before any hardware imports
+os.environ["BLINKA_MCP2221"] = "1"
 
 DELAY_TIME = 999
 

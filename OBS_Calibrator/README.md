@@ -17,8 +17,8 @@ A professional PySide6-based application for calibrating Optical Backscatter (OB
 ## System Requirements
 
 ### Required Software
-- **Python 3.13 or higher** (required for all platforms)
-- **Git** (for cloning the repository)
+- **Python 3.12 or higher** (Python 3.13 recommended)
+- **Git** (for cloning the repository) - optional if downloading as ZIP
 
 ### Supported Platforms
 - **Windows 10/11** (x86-64)
@@ -30,100 +30,95 @@ A professional PySide6-based application for calibrating Optical Backscatter (OB
 - **MCP2221 USB-to-I2C bridge** for computer connectivity
 - Application runs in simulation mode when hardware is not connected
 
-## Quick Start
+## 🚀 Easy Installation (Recommended)
 
-### 1. Install Python 3.13+
+### Step 1: Install Python
 
-**Windows:**
-- Download from [python.org](https://www.python.org/downloads/)
-- During installation, check "Add Python to PATH"
-- Verify installation: `python --version`
+**Never used Python before? No problem!**
 
-**macOS:**
-- Install via Homebrew: `brew install python@3.13`
-- Or download from [python.org](https://www.python.org/downloads/)
-- Verify installation: `python3 --version`
+**Windows Users:**
+1. Go to [python.org/downloads](https://www.python.org/downloads/)
+2. Download Python 3.13 (or latest version)
+3. **IMPORTANT:** During installation, check the box that says "Add Python to PATH"
+4. Click "Install Now"
+5. Open Command Prompt (search "cmd" in Start menu) and type: `python --version`
+6. You should see something like "Python 3.13.x"
 
-### 2. Clone the Repository
+**Mac Users:**
+1. **Easy way:** Install Homebrew first: [brew.sh](https://brew.sh/)
+2. Then run: `brew install python@3.13`
+3. **Alternative:** Download from [python.org/downloads](https://www.python.org/downloads/)
+4. Open Terminal and type: `python3 --version`
+5. You should see something like "Python 3.13.x"
 
+### Step 2: Get the Code
+
+**Option A: Using Git (if you have it)**
 ```bash
 git clone <repository-url>
 cd OBS_Calibrator
 ```
 
-### 3. Run Installation Script
+**Option B: Download ZIP (easier)**
+1. Download the project as a ZIP file
+2. Extract it to a folder (like Desktop/OBS_Calibrator)
+3. Open Command Prompt (Windows) or Terminal (Mac) in that folder
+
+### Step 3: Choose Your Installation Path
+
+## 🎯 Path 1: Build Standalone Application (Easiest)
+
+**This creates an app that runs without Python installed**
 
 **Windows:**
-```cmd
-install_windows.bat
-```
+1. Double-click `build_installer.bat`
+2. Wait for it to complete (may take 5-10 minutes)
+3. Find your app in the `dist` folder
+4. Double-click `OBS_Calibrator.exe` to run
 
-**macOS/Linux:**
-```bash
-chmod +x install_macos.sh
-./install_macos.sh
-```
+**Mac:**
+1. Open Terminal in the project folder
+2. Run: `chmod +x build_installer.sh`
+3. Run: `./build_installer.sh`
+4. Wait for it to complete (may take 5-10 minutes)
+5. Find your app in the `dist` folder
+6. Double-click `OBS_Calibrator.app` to run
 
-### 4. Launch the Application
+## 🔧 Path 2: Run from Source (If Path 1 fails)
+
+**Step 1: Install Dependencies**
 
 **Windows:**
-```cmd
-run_obs_calibrator_windows.bat
-```
+1. Double-click `install_dependencies.bat`
+2. Wait for installation to complete
 
-**macOS/Linux:**
-```bash
-chmod +x run_obs_calibrator_macos.sh
-./run_obs_calibrator_macos.sh
-```
+**Mac:**
+1. Run: `chmod +x install_dependencies.sh`
+2. Run: `./install_dependencies.sh`
+3. Wait for installation to complete
 
-## Manual Installation
+**Step 2: Run the Application**
 
-If you prefer to install manually or encounter issues with the automated scripts:
+**Windows:**
+- Double-click `run_from_source.bat`
 
-### 1. Create Virtual Environment
-```bash
-python -m venv venv
+**Mac:**
+- Run: `chmod +x run_from_source.sh`
+- Run: `./run_from_source.sh`
 
-# Windows
-venv\Scripts\activate
+## 📋 What Each Script Does
 
-# macOS/Linux
-source venv/bin/activate
-```
+- **`build_installer.*`**: Creates a standalone application you can run anywhere
+- **`install_dependencies.*`**: Sets up a safe Python environment with all required packages
+- **`run_from_source.*`**: Runs the app from Python source code (automatically handles environment)
 
-### 2. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
+## ✅ Quick Test
 
-### 3. Run Application
-```bash
-python OBS_Calibrator.py
-```
-
-## Building Installers (Advanced)
-
-For creating standalone executable installers:
-
-### Prerequisites
-- Complete the installation steps above
-- PyInstaller (included in requirements.txt)
-
-### Build Commands
-
-**Windows (.exe):**
-```cmd
-build_windows.bat
-```
-
-**macOS (.app and .dmg):**
-```bash
-chmod +x build_macos.sh
-./build_macos.sh
-```
-
-Built installers will be available in the `dist/` directory.
+After installation, the application should:
+1. Open with a dark theme interface
+2. Show "Hardware connected" or "No Device!" in the serial number field
+3. Allow you to configure calibration points
+4. Let you start sensor readings (real or simulated)
 
 ## Usage
 
