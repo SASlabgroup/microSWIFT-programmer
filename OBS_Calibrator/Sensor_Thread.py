@@ -16,8 +16,10 @@ class SensorThread(QThread):
         super().__init__(parent)
         self.sample_count = 10  # Default value
         self._running = False
+
     def set_sample_count(self, count: int):
         self.sample_count = count
+
     def run(self):
         self._running = True
         i2c = board.I2C()
@@ -48,7 +50,6 @@ class SensorThread(QThread):
             stdev = 0
 
         self.finished.emit(mean, stdev)
-
 
     @Slot()
     def stop(self):
