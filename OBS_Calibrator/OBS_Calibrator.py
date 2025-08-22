@@ -18,10 +18,22 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 
 from Sensor_Thread import SensorThread
-from Python.autogen.settings import url, import_paths
+try:
+    from Python.autogen.settings import url, import_paths
+except ImportError:
+    # When running from PyInstaller bundle
+    try:
+        from app_python.autogen.settings import url, import_paths
+    except ImportError:
+        # Fallback values
+        url = "OBS_Calibration_WindowContent/App.qml"
+        import_paths = ["."]
+        print("Warning: Using fallback import paths")
 
 matplotlib.use("Agg")  # Non-GUI backend for safe offscreen plotting
 os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"
+# Force dark theme regardless of system settings
+os.environ["QT_QUICK_CONTROLS_CONF"] = "qtquickcontrols2.conf"
 # Set the BLINKA_MCP2221 environment variable before any other imports
 os.environ["BLINKA_MCP2221"] = "1"
 
@@ -45,6 +57,7 @@ class UIController(QObject):
         self.num_points = 1
         self.cal_point_complete = [False] * 10
         self.cal_points = [[0.0, 0.0] for _ in range(10)]
+        self.hardware_connected = False
 
     def setup(self, root_object):
         """Call this after QML has loaded to bind UI objects."""
@@ -70,10 +83,14 @@ class UIController(QObject):
 
         self.sensor_thread.proximity_read.connect(self.update_samples_text_area)
         self.sensor_thread.finished.connect(self.handle_sensor_finished)
+        self.sensor_thread.hardware_status.connect(self.handle_hardware_status)
         self.find_equation_button.clicked.connect(self.compute_calibration_equation)
 
         # Connect signals
         self.num_calibration_points_spinbox.valueChanged.connect(self.update_ntu_components)
+        
+        # Set initial hardware status
+        self.handle_hardware_status(self.sensor_thread.hardware_connected)
 
     @Slot()
     @Slot()
@@ -100,9 +117,16 @@ class UIController(QObject):
             self.num_calibration_points_spinbox.setProperty("value", 1)
             self.num_calibration_points_spinbox.setProperty("enabled", True)
 
-        # Reset serial number field
+        # Reset serial number field based on hardware status
         if self.serialNumberTextField:
-            self.serialNumberTextField.setProperty("text", "0")
+            if self.hardware_connected:
+                self.serialNumberTextField.setProperty("text", "0")
+                # Reset to default text color using Qt stylesheet
+                self.serialNumberTextField.setProperty("styleSheet", "")
+            else:
+                self.serialNumberTextField.setProperty("text", "No Device!")
+                # Set red text color using Qt stylesheet
+                self.serialNumberTextField.setProperty("styleSheet", "color: red; font-weight: bold;")
 
         # Reset buttons
         if self.find_equation_button:
@@ -112,6 +136,27 @@ class UIController(QObject):
 
         # Clear pending plot data
         self._pending_plot_data = None
+
+    @Slot(bool)
+    def handle_hardware_status(self, connected):
+        """Handle hardware connection status updates."""
+        self.hardware_connected = connected
+        
+        if self.serialNumberTextField:
+            if connected:
+                # Hardware is connected - reset to normal state
+                self.serialNumberTextField.setProperty("text", "0")
+                # Reset to default text color using Qt stylesheet
+                self.serialNumberTextField.setProperty("styleSheet", "")
+                self.serialNumberTextField.setProperty("placeholderText", "Serial Number")
+                print("Hardware connected - normal operation mode")
+            else:
+                # Hardware not connected - show red warning
+                self.serialNumberTextField.setProperty("text", "No Device!")
+                # Set red text color using Qt stylesheet
+                self.serialNumberTextField.setProperty("styleSheet", "color: red; font-weight: bold;")
+                self.serialNumberTextField.setProperty("placeholderText", "Hardware Not Found")
+                print("Hardware not connected - simulation mode active")
 
     def enable_sampling_controls(self, component):
         for name in ["startButton", "numSamplesSpinBox", "ntuConcentrationSpinBox"]:
@@ -374,9 +419,38 @@ class UIController(QObject):
 
 if __name__ == '__main__':
     app = QGuiApplication(sys.argv)
+    
+    # Force dark theme at the application level
+    from PySide6.QtGui import QPalette, QColor
+    dark_palette = QPalette()
+    dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))
+    dark_palette.setColor(QPalette.WindowText, QColor(255, 255, 255))
+    dark_palette.setColor(QPalette.Base, QColor(25, 25, 25))
+    dark_palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
+    dark_palette.setColor(QPalette.ToolTipBase, QColor(0, 0, 0))
+    dark_palette.setColor(QPalette.ToolTipText, QColor(255, 255, 255))
+    dark_palette.setColor(QPalette.Text, QColor(255, 255, 255))
+    dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))
+    dark_palette.setColor(QPalette.ButtonText, QColor(255, 255, 255))
+    dark_palette.setColor(QPalette.BrightText, QColor(255, 0, 0))
+    dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
+    dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+    dark_palette.setColor(QPalette.HighlightedText, QColor(0, 0, 0))
+    app.setPalette(dark_palette)
+    
     engine = QQmlApplicationEngine()
 
-    app_dir = Path(__file__).parent
+    # Determine the correct base path for QML files
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # Running from PyInstaller bundle
+        app_dir = Path(sys._MEIPASS)
+        qml_file_path = app_dir / "OBS_Calibration_WindowContent" / "App.qml"
+    else:
+        # Running from source
+        app_dir = Path(__file__).parent
+        qml_file_path = app_dir / "OBS_Calibration_WindowContent" / "App.qml"
+    
+    # Add import paths
     engine.addImportPath(os.fspath(app_dir))
     for path in import_paths:
         engine.addImportPath(os.fspath(app_dir / path))
@@ -387,12 +461,11 @@ if __name__ == '__main__':
     # Expose controller BEFORE QML loads
     engine.rootContext().setContextProperty("uiController", controller)
 
-    # Only load ONE entry QML file
-    engine.load(QUrl("OBS_Calibrator/OBS_Calibration_WindowContent/App.qml"))
-    # or:
-    # engine.load(QUrl("OBS_Calibrator/OBS_Calibration_WindowContent/OBS_Calibrator_Screen.ui.qml"))
+    # Load the QML file
+    engine.load(QUrl.fromLocalFile(str(qml_file_path)))
 
     if not engine.rootObjects():
+        print(f"Failed to load QML file: {qml_file_path}")
         sys.exit(-1)
 
     root_object = engine.rootObjects()[0]
