@@ -45,9 +45,11 @@ sudo apt install python3-venv python3-dev
 
 **Solution:**
 ```bash
-chmod +x build_installer.sh
-chmod +x install_dependencies.sh  
-chmod +x run_from_source.sh
+# For quick access scripts in root
+chmod +x build.sh
+
+# For all scripts in their directories
+chmod +x scripts/unix/*.sh
 ```
 
 ### 🔧 Build Script Fails
@@ -58,18 +60,18 @@ chmod +x run_from_source.sh
 1. **Free up disk space** (build needs ~2GB temporarily)
 2. **Use the cleanup script:**
    ```bash
-   ./cleanup_build.sh  # macOS/Linux
-   cleanup_build.bat   # Windows
+   ./scripts/unix/cleanup_build.sh  # macOS/Linux
+   scripts\windows\cleanup_build.bat   # Windows
    ```
 3. **Manual clean and retry:**
    ```bash
    rm -rf venv build dist __pycache__
-   ./build_installer.sh
+   ./build.sh  # or ./scripts/unix/build_installer.sh
    ```
 4. **Try Path 2 instead:**
    ```bash
-   ./install_dependencies.sh
-   ./run_from_source.sh
+   ./scripts/unix/install_dependencies.sh
+   ./scripts/unix/run_from_source.sh
    ```
 
 ### 🔧 Disk Space Issues
@@ -86,10 +88,10 @@ chmod +x run_from_source.sh
 2. **Run cleanup manually:**
    ```bash
    # macOS/Linux
-   ./cleanup_build.sh
+   ./scripts/unix/cleanup_build.sh
    
    # Windows
-   cleanup_build.bat
+   scripts\windows\cleanup_build.bat
    ```
 
 3. **What cleanup removes:**
@@ -126,8 +128,8 @@ chmod +x run_from_source.sh
 
 3. **Try running from source:**
    ```bash
-   ./run_from_source.sh  # macOS/Linux
-   run_from_source.bat   # Windows
+   ./scripts/unix/run_from_source.sh  # macOS/Linux
+   scripts\windows\run_from_source.bat   # Windows
    ```
 
 ### 🔧 Dark Theme Issues
@@ -182,27 +184,45 @@ chmod +x run_from_source.sh
 
 ## Script-Specific Issues
 
-### 🔧 install_dependencies.sh Fails
+### 🔧 Script Not Found
+
+**Error:** `No such file or directory` when running scripts
+
+**Solution:**
+```bash
+# Scripts are now in subdirectories:
+./scripts/unix/build_installer.sh    # macOS/Linux
+scripts\windows\build_installer.bat  # Windows
+
+# Or use convenience scripts from root:
+./build.sh    # macOS/Linux
+build.bat     # Windows
+```
+
+### 🔧 install_dependencies Script Fails
 
 **Common fixes:**
 ```bash
 # Clean start
 rm -rf venv
-./install_dependencies.sh
+./scripts/unix/install_dependencies.sh
 
 # Check Python version
 python3 --version  # Should be 3.12+
 
-# Manual installation
+# Manual installation from project root
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 🔧 run_from_source.sh Fails
+### 🔧 run_from_source Script Fails
 
 **Error:** `Virtual environment not found`
-**Solution:** Run `./install_dependencies.sh` first
+**Solution:** Run `./scripts/unix/install_dependencies.sh` first
+
+**Error:** `src/OBS_Calibrator.py not found`
+**Solution:** Make sure you're in the project root directory
 
 **Error:** `Required dependencies are missing`
 **Solution:** 
@@ -219,9 +239,10 @@ deactivate
 **Symptoms:** Double-clicking .bat files opens them in text editor
 
 **Solution:**
-1. Right-click the .bat file
-2. Select "Open with" → "Command Prompt"
-3. Or run from Command Prompt: `install_dependencies.bat`
+1. Navigate to `scripts\windows\` folder
+2. Right-click the .bat file
+3. Select "Open with" → "Command Prompt"
+4. Or from Command Prompt: `cd scripts\windows && install_dependencies.bat`
 
 ### 🔧 PowerShell Execution Policy
 
@@ -244,17 +265,24 @@ If you're still having issues:
    - Python 3.12+ installed and in PATH
    - At least 2GB free disk space for building (can be reclaimed with cleanup)
    - Administrative privileges may be needed for some operations
-5. **Low on disk space?** Run `cleanup_build.*` to free up ~2GB after building
+5. **Low on disk space?** Run `scripts/[platform]/cleanup_build.*` to free up ~2GB after building
 
 ## Quick Reference
 
+### Script Locations
+- **Quick access from root:** `build.sh` / `build.bat`
+- **Platform scripts:** `scripts/unix/*.sh` or `scripts\windows\*.bat`
+- **Source code:** `src/` directory
+- **UI files:** `ui/` directory
+- **Build config:** `build_config/` directory
+
 ### File Purposes
-- `build_installer.*` → Creates standalone app with optional cleanup (Path 1)
-- `install_dependencies.*` → Sets up Python environment (Path 2)
-- `run_from_source.*` → Runs app from source code (Path 2)
-- `cleanup_build.*` → Removes build artifacts to save ~2GB disk space
+- `scripts/[platform]/build_installer.*` → Creates standalone app with cleanup (Path 1)
+- `scripts/[platform]/install_dependencies.*` → Sets up Python environment (Path 2)
+- `scripts/[platform]/run_from_source.*` → Runs app from source code (Path 2)
+- `scripts/[platform]/cleanup_build.*` → Removes build artifacts to save ~2GB
 
 ### Recommended Installation Order
-1. Try `build_installer.*` first (creates standalone app)
-2. If that fails, use `install_dependencies.*` then `run_from_source.*`
+1. Try `build.sh` or `build.bat` first (creates standalone app)
+2. If that fails, use Path 2 scripts in `scripts/[platform]/`
 3. Both approaches work, Path 1 is more user-friendly, Path 2 is more reliable

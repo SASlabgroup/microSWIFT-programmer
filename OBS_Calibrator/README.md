@@ -69,16 +69,18 @@ cd OBS_Calibrator
 **This creates an app that runs without Python installed**
 
 **Windows:**
-1. Double-click `build_installer.bat`
+1. Double-click `build.bat` in the project root
+   - Or navigate to `scripts\windows\` and run `build_installer.bat`
 2. Wait for it to complete (may take 5-10 minutes)
 3. **Optional:** When prompted, choose to clean up build files (saves ~2GB)
-4. Find your app in the `dist` folder
+4. Find your app in the `dist\OBS_Calibrator\` folder
 5. Double-click `OBS_Calibrator.exe` to run
 
 **Mac:**
 1. Open Terminal in the project folder
-2. Run: `chmod +x build_installer.sh`
-3. Run: `./build_installer.sh`
+2. Run: `chmod +x build.sh scripts/unix/*.sh`
+3. Run: `./build.sh`
+   - Or run: `./scripts/unix/build_installer.sh`
 4. Wait for it to complete (may take 5-10 minutes)
 5. **Optional:** When prompted, choose to clean up build files (saves ~2GB)
 6. Find your app in the `dist` folder
@@ -89,29 +91,31 @@ cd OBS_Calibrator
 **Step 1: Install Dependencies**
 
 **Windows:**
-1. Double-click `install_dependencies.bat`
-2. Wait for installation to complete
+1. Navigate to `scripts\windows\`
+2. Double-click `install_dependencies.bat`
+3. Wait for installation to complete
 
 **Mac:**
-1. Run: `chmod +x install_dependencies.sh`
-2. Run: `./install_dependencies.sh`
+1. Run: `chmod +x scripts/unix/*.sh`
+2. Run: `./scripts/unix/install_dependencies.sh`
 3. Wait for installation to complete
 
 **Step 2: Run the Application**
 
 **Windows:**
+- Navigate to `scripts\windows\`
 - Double-click `run_from_source.bat`
 
 **Mac:**
-- Run: `chmod +x run_from_source.sh`
-- Run: `./run_from_source.sh`
+- Run: `./scripts/unix/run_from_source.sh`
 
 ## 📋 What Each Script Does
 
-- **`build_installer.*`**: Creates a standalone application you can run anywhere (includes optional cleanup)
-- **`install_dependencies.*`**: Sets up a safe Python environment with all required packages
-- **`run_from_source.*`**: Runs the app from Python source code (automatically handles environment)
-- **`cleanup_build.*`**: Removes build artifacts to save disk space (~2GB) while keeping your app
+- **`build.sh` / `build.bat`**: Quick access scripts in project root that call the build installer
+- **`scripts/[platform]/build_installer.*`**: Creates a standalone application (includes optional cleanup)
+- **`scripts/[platform]/install_dependencies.*`**: Sets up Python environment with all required packages
+- **`scripts/[platform]/run_from_source.*`**: Runs the app from Python source code
+- **`scripts/[platform]/cleanup_build.*`**: Removes build artifacts to save disk space (~2GB)
 
 ## ✅ Quick Test
 
@@ -160,7 +164,7 @@ After installation, the application should:
 **Application won't start:**
 - Check console output for error messages
 - Ensure all dependencies are installed
-- Try running directly: `python OBS_Calibrator.py`
+- Try running directly: `python src/OBS_Calibrator.py`
 
 ### Getting Help
 
@@ -175,18 +179,39 @@ After installation, the application should:
 ### Project Structure
 ```
 OBS_Calibrator/
-├── OBS_Calibrator.py          # Main application file
-├── Sensor_Thread.py           # Hardware interface and simulation
-├── requirements.txt           # Python dependencies
-├── qtquickcontrols2.conf     # Qt theme configuration
-├── OBS_Calibration_WindowContent/  # QML user interface files
-├── Python/autogen/           # Auto-generated settings
-├── build_installer.*         # Path 1: Build standalone app (with cleanup)
-├── install_dependencies.*    # Path 2: Install dependencies
-├── run_from_source.*         # Path 2: Run from source
-├── cleanup_build.*           # Remove build files to save space
-├── README.md                 # This file
-└── TROUBLESHOOTING.md        # Detailed troubleshooting guide
+├── README.md                    # Project documentation
+├── TROUBLESHOOTING.md           # Detailed help guide
+├── requirements.txt             # Python dependencies
+├── build.sh / build.bat         # Quick build scripts
+│
+├── src/                         # Application source code
+│   ├── OBS_Calibrator.py        # Main application
+│   ├── Sensor_Thread.py         # Hardware interface
+│   └── debug_hardware.py        # Hardware debugging tool
+│
+├── ui/                          # User interface files
+│   ├── OBS_Calibration_Window/  # QML window definitions
+│   ├── OBS_Calibration_WindowContent/  # QML components
+│   └── qtquickcontrols2.conf   # Qt theme configuration
+│
+├── scripts/                     # Platform-specific scripts
+│   ├── windows/                 # Windows batch files
+│   │   ├── build_installer.bat
+│   │   ├── cleanup_build.bat
+│   │   ├── install_dependencies.bat
+│   │   └── run_from_source.bat
+│   └── unix/                    # macOS/Linux scripts
+│       ├── build_installer.sh
+│       ├── cleanup_build.sh
+│       ├── install_dependencies.sh
+│       └── run_from_source.sh
+│
+├── build_config/                # Build configuration
+│   ├── OBS_Calibrator.spec      # PyInstaller configuration
+│   ├── pyi_rth_blinka.py        # Runtime hook for hardware
+│   └── dmg_config.py            # macOS DMG configuration
+│
+└── Python/autogen/              # Auto-generated settings
 ```
 
 ### Dependencies
