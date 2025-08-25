@@ -32,15 +32,39 @@ except ImportError:
 
 matplotlib.use("Agg")  # Non-GUI backend for safe offscreen plotting
 os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"
-# Force dark theme regardless of system settings
-# Look for conf file in ui directory
-if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-    # Running from PyInstaller bundle
-    os.environ["QT_QUICK_CONTROLS_CONF"] = "qtquickcontrols2.conf"
+
+# Look for qtquickcontrols2.conf file
+def find_config_file():
+    """Find the qtquickcontrols2.conf file in various possible locations."""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # Running from PyInstaller bundle
+        # Try multiple possible locations
+        possible_paths = [
+            Path(sys._MEIPASS) / "qtquickcontrols2.conf",
+            Path(sys._MEIPASS) / "ui" / "qtquickcontrols2.conf",
+            Path(os.getcwd()) / "qtquickcontrols2.conf",
+            Path(os.getcwd()) / "ui" / "qtquickcontrols2.conf",
+        ]
+    else:
+        # Running from source
+        possible_paths = [
+            Path(__file__).parent.parent / "ui" / "qtquickcontrols2.conf",
+            Path(os.getcwd()) / "ui" / "qtquickcontrols2.conf",
+        ]
+    
+    for path in possible_paths:
+        if path.exists():
+            return str(path.absolute())
+    
+    # If not found, try to use relative path
+    return "qtquickcontrols2.conf"
+
+conf_file = find_config_file()
+if conf_file and os.path.exists(conf_file):
+    os.environ["QT_QUICK_CONTROLS_CONF"] = conf_file
 else:
-    # Running from source
-    conf_path = Path(__file__).parent.parent / "ui" / "qtquickcontrols2.conf"
-    os.environ["QT_QUICK_CONTROLS_CONF"] = str(conf_path)
+    # Warning but don't fail - the app can still work without the config
+    print(f"Warning: qtquickcontrols2.conf not found at expected locations")
 
 
 
