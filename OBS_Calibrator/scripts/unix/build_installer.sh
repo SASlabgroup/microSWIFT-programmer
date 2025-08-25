@@ -150,12 +150,16 @@ print_success "Dependencies installed successfully"
 
 # Build application with PyInstaller
 print_status "Building standalone application..."
-if [ ! -f "build_config/OBS_Calibrator.spec" ]; then
-    print_error "build_config/OBS_Calibrator.spec not found!"
+# Use the standard spec file for reliable builds
+if [ -f "build_config/OBS_Calibrator.spec" ]; then
+    print_status "Using standard build configuration..."
+    SPEC_FILE="build_config/OBS_Calibrator.spec"
+else
+    print_error "No spec file found!"
     exit 1
 fi
 
-pyinstaller --noconfirm build_config/OBS_Calibrator.spec
+pyinstaller --clean --noconfirm "$SPEC_FILE"
 if [ $? -ne 0 ]; then
     print_error "Failed to build application!"
     echo "Check the console output above for details."
@@ -234,11 +238,9 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         rm -rf build
     fi
     
-    # Remove Python cache
-    if [ -d "__pycache__" ]; then
-        print_status "Removing Python cache..."
-        rm -rf __pycache__
-    fi
+    # Remove all Python cache directories
+    print_status "Removing Python cache directories..."
+    find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
     
     # Remove unpacked distribution (but keep .app for macOS)
     if [ -d "dist/OBS_Calibrator" ] && [ ! -f "dist/OBS_Calibrator.exe" ]; then

@@ -88,13 +88,14 @@ else
     print_warning "Build directory not found"
 fi
 
-# Remove Python cache
-if [ -d "__pycache__" ]; then
-    print_status "Removing Python cache..."
-    rm -rf __pycache__
-    print_success "Python cache removed"
+# Remove all Python cache directories
+print_status "Removing Python cache directories..."
+PYCACHE_COUNT=$(find . -type d -name "__pycache__" 2>/dev/null | wc -l)
+if [ "$PYCACHE_COUNT" -gt 0 ]; then
+    find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+    print_success "Removed $PYCACHE_COUNT Python cache directories"
 else
-    print_warning "Python cache not found"
+    print_warning "No Python cache directories found"
 fi
 
 # Remove unpacked distribution (but keep .app for macOS)
