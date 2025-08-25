@@ -31,10 +31,17 @@ echo "      OBS Calibrator - Running from Source"
 echo "=============================================="
 echo ""
 
+# Get the project root directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Change to project root
+cd "$PROJECT_ROOT" || exit 1
+
 # Check if we're in the right directory
-if [ ! -f "OBS_Calibrator.py" ]; then
-    print_error "OBS_Calibrator.py not found!"
-    echo "Please run this script from the OBS_Calibrator directory."
+if [ ! -f "src/OBS_Calibrator.py" ]; then
+    print_error "src/OBS_Calibrator.py not found!"
+    echo "Project structure error. Expected to find src/OBS_Calibrator.py"
     exit 1
 fi
 
@@ -102,8 +109,8 @@ print_success "Dependencies verified"
 print_status "Starting OBS Calibrator..."
 echo ""
 
-# Run the Python application - let it handle its own output
-python OBS_Calibrator.py
+# Run the Python application from src directory - let it handle its own output
+python src/OBS_Calibrator.py
 
 # Note: The cleanup function will be called automatically when the script exits
 # This ensures the virtual environment is properly deactivated regardless of how the app exits

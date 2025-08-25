@@ -1,6 +1,6 @@
 #!/bin/bash
-# OBS Calibrator - Automated Installer (macOS/Linux)
-# This script sets up the development environment and builds a standalone application
+# OBS Calibrator - Dependency Installer (macOS/Linux)
+# This script installs all required dependencies for running from source
 
 set -e  # Exit on any error
 
@@ -50,7 +50,7 @@ version_ge() {
 }
 
 echo "=============================================="
-echo "    OBS Calibrator - Automated Installer"
+echo "    OBS Calibrator - Dependency Installer"
 echo "=============================================="
 echo ""
 
@@ -92,30 +92,35 @@ fi
 
 print_status "Using Python command: $PYTHON_CMD"
 
+# Get the project root directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Change to project root
+cd "$PROJECT_ROOT" || exit 1
+
 # Check if we're in the right directory
-if [ ! -f "OBS_Calibrator.py" ]; then
-    print_error "OBS_Calibrator.py not found!"
-    echo "Please run this script from the OBS_Calibrator directory."
+if [ ! -f "src/OBS_Calibrator.py" ]; then
+    print_error "src/OBS_Calibrator.py not found!"
+    echo "Project structure error. Expected to find src/OBS_Calibrator.py"
+    echo ""
     exit 1
 fi
-
-# Create virtual environment
-print_status "Creating virtual environment..."
-if [ -d "venv" ]; then
-    print_warning "Virtual environment already exists. Removing..."
-    rm -rf venv
+# Create virtual environment if it doesn't exist
+if [ ! -d "venv" ]; then
+    print_status "Creating virtual environment..."
+    $PYTHON_CMD -m venv venv
+    if [ $? -ne 0 ]; then
+        print_error "Failed to create virtual environment!"
+        echo "Please ensure python3-venv is installed:"
+        echo "  Ubuntu/Debian: sudo apt install python3-venv"
+        echo "  macOS: Should be included with Python"
+        exit 1
+    fi
+    print_success "Virtual environment created"
+else
+    print_status "Virtual environment already exists"
 fi
-
-$PYTHON_CMD -m venv venv
-if [ $? -ne 0 ]; then
-    print_error "Failed to create virtual environment!"
-    echo "Please ensure python3-venv is installed:"
-    echo "  Ubuntu/Debian: sudo apt install python3-venv"
-    echo "  macOS: Should be included with Python"
-    exit 1
-fi
-
-print_success "Virtual environment created"
 
 # Activate virtual environment
 print_status "Activating virtual environment..."
@@ -141,62 +146,26 @@ fi
 
 print_success "Dependencies installed successfully"
 
-# Build application with PyInstaller
-print_status "Building standalone application..."
-if [ ! -f "OBS_Calibrator.spec" ]; then
-    print_error "OBS_Calibrator.spec not found!"
-    exit 1
-fi
-
-pyinstaller --noconfirm OBS_Calibrator.spec
-if [ $? -ne 0 ]; then
-    print_error "Failed to build application!"
-    echo "Check the console output above for details."
-    exit 1
-fi
-
-print_success "Application built successfully"
-
-# Check what was built
-if [ -d "dist/OBS_Calibrator.app" ]; then
-    APP_PATH="dist/OBS_Calibrator.app"
-    print_success "macOS Application built: $APP_PATH"
-    echo ""
-    echo "To run the application:"
-    echo "  1. Open Finder and navigate to the project directory"
-    echo "  2. Go to the 'dist' folder"
-    echo "  3. Double-click 'OBS_Calibrator.app'"
-    echo ""
-    echo "Or from terminal:"
-    echo "  open \"$APP_PATH\""
-    
-elif [ -f "dist/OBS_Calibrator/OBS_Calibrator" ]; then
-    APP_PATH="dist/OBS_Calibrator/OBS_Calibrator"
-    print_success "Linux Application built: dist/OBS_Calibrator/"
-    echo ""
-    echo "To run the application:"
-    echo "  cd dist/OBS_Calibrator"
-    echo "  ./OBS_Calibrator"
-    echo ""
-    echo "Or from current directory:"
-    echo "  \"$APP_PATH\""
-else
-    print_warning "Application built but location unclear. Check the dist/ directory."
-fi
+# Test the installation
+print_status "Testing installation..."
+python -c "import PySide6; print('PySide6:', PySide6.__version__)" 2>/dev/null
+python -c "import matplotlib; print('matplotlib:', matplotlib.__version__)" 2>/dev/null  
+python -c "import numpy; print('numpy:', numpy.__version__)" 2>/dev/null
+python -c "import sklearn; print('scikit-learn:', sklearn.__version__)" 2>/dev/null
 
 # Deactivate virtual environment
 deactivate
 
 echo ""
 echo "=============================================="
-print_success "Installation completed successfully!"
+print_success "Dependencies installed successfully!"
 echo "=============================================="
 echo ""
-echo "What happens next:"
-echo "  1. The standalone application is ready to use"
-echo "  2. No Python environment needed to run the app"
-echo "  3. The app will work on similar systems without installation"
-echo ""
-echo "If you need to run from source instead, use:"
+echo "You can now run the application using:"
 echo "  ./run_from_source.sh"
+echo ""
+echo "Or manually:"
+echo "  source venv/bin/activate"
+echo "  python src/OBS_Calibrator.py"
+echo "  deactivate"
 echo ""

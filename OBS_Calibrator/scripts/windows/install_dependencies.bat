@@ -53,10 +53,15 @@ if %PYTHON_MAJOR% equ 3 if %PYTHON_MINOR% lss 12 (
 
 echo [SUCCESS] Python %PYTHON_VERSION% detected
 
+REM Get the project root directory
+set "SCRIPT_DIR=%~dp0"
+for %%A in ("%SCRIPT_DIR%..\..\.") do set "PROJECT_ROOT=%%~fA"
+cd /d "%PROJECT_ROOT%"
+
 REM Check if we're in the right directory
-if not exist "OBS_Calibrator.py" (
-    echo [ERROR] OBS_Calibrator.py not found!
-    echo Please run this script from the OBS_Calibrator directory.
+if not exist "src\OBS_Calibrator.py" (
+    echo [ERROR] src\OBS_Calibrator.py not found!
+    echo Project structure error. Expected to find src\OBS_Calibrator.py
     echo.
     pause
     exit /b 1
@@ -125,7 +130,7 @@ echo   run_from_source.bat
 echo.
 echo Or manually:
 echo   venv\Scripts\activate.bat
-echo   python OBS_Calibrator.py
+echo   python src\OBS_Calibrator.py
 echo   venv\Scripts\deactivate.bat
 echo.
 pause

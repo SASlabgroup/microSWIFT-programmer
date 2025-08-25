@@ -9,10 +9,15 @@ echo       OBS Calibrator - Running from Source
 echo ==============================================
 echo.
 
+REM Get the project root directory
+set "SCRIPT_DIR=%~dp0"
+for %%A in ("%SCRIPT_DIR%..\..\.") do set "PROJECT_ROOT=%%~fA"
+cd /d "%PROJECT_ROOT%"
+
 REM Check if we're in the right directory
-if not exist "OBS_Calibrator.py" (
-    echo [ERROR] OBS_Calibrator.py not found!
-    echo Please run this script from the OBS_Calibrator directory.
+if not exist "src\OBS_Calibrator.py" (
+    echo [ERROR] src\OBS_Calibrator.py not found!
+    echo Project structure error. Expected to find src\OBS_Calibrator.py
     echo.
     pause
     exit /b 1
@@ -64,8 +69,8 @@ REM Run the application
 echo [INFO] Starting OBS Calibrator...
 echo.
 
-REM Run the Python application
-python OBS_Calibrator.py
+REM Run the Python application from src directory
+python src\OBS_Calibrator.py
 
 REM Capture the exit code
 set APP_EXIT_CODE=%errorlevel%

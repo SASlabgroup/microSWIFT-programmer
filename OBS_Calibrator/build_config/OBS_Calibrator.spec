@@ -4,10 +4,11 @@ import sys
 import os
 from pathlib import Path
 
-# Get the current directory (where the spec file is located)
-SPEC_DIR = Path(os.getcwd())
+# Get the project root directory (parent of build_config)
+SPEC_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = SPEC_DIR.parent
 APP_NAME = "OBS_Calibrator"
-MAIN_SCRIPT = str(SPEC_DIR / "OBS_Calibrator.py")
+MAIN_SCRIPT = str(PROJECT_ROOT / "src" / "OBS_Calibrator.py")
 
 # Platform-specific configurations
 IS_WINDOWS = sys.platform.startswith('win')
@@ -17,18 +18,18 @@ IS_LINUX = sys.platform.startswith('linux')
 # Data files to include
 data_files = [
     # QML files and directories
-    (str(SPEC_DIR / 'OBS_Calibration_WindowContent'), 'OBS_Calibration_WindowContent'),
-    (str(SPEC_DIR / 'OBS_Calibration_Window'), 'OBS_Calibration_Window'),
-    (str(SPEC_DIR / 'Python'), 'app_python'),  # Rename to avoid conflict
+    (str(PROJECT_ROOT / 'ui' / 'OBS_Calibration_WindowContent'), 'OBS_Calibration_WindowContent'),
+    (str(PROJECT_ROOT / 'ui' / 'OBS_Calibration_Window'), 'OBS_Calibration_Window'),
+    (str(PROJECT_ROOT / 'Python'), 'app_python'),  # Rename to avoid conflict
     
     # Configuration files
-    (str(SPEC_DIR / 'qtquickcontrols2.conf'), '.'),
+    (str(PROJECT_ROOT / 'ui' / 'qtquickcontrols2.conf'), '.'),
     
     # Requirements file for reference
-    (str(SPEC_DIR / 'requirements.txt'), '.'),
+    (str(PROJECT_ROOT / 'requirements.txt'), '.'),
     
     # README for users
-    (str(SPEC_DIR / 'README.md'), '.'),
+    (str(PROJECT_ROOT / 'README.md'), '.'),
 ]
 
 # Hidden imports that PyInstaller might miss
@@ -91,10 +92,11 @@ hidden_imports = [
 def collect_qml_files(qml_dir):
     """Recursively collect all QML files from a directory."""
     qml_files = []
-    qml_path = SPEC_DIR / qml_dir
+    qml_path = PROJECT_ROOT / 'ui' / qml_dir
     if qml_path.exists():
         for qml_file in qml_path.rglob('*.qml'):
-            rel_path = qml_file.relative_to(SPEC_DIR)
+            # Preserve the original path structure for QML files
+            rel_path = Path(qml_dir) / qml_file.relative_to(qml_path)
             qml_files.append((str(qml_file), str(rel_path.parent)))
     return qml_files
 
@@ -108,7 +110,7 @@ all_data_files = data_files + qml_data_files
 
 a = Analysis(
     [MAIN_SCRIPT],
-    pathex=[str(SPEC_DIR)],
+    pathex=[str(PROJECT_ROOT / 'src'), str(PROJECT_ROOT)],
     binaries=[],
     datas=all_data_files,
     hiddenimports=hidden_imports,

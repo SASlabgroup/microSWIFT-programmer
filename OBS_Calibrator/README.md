@@ -71,16 +71,18 @@ cd OBS_Calibrator
 **Windows:**
 1. Double-click `build_installer.bat`
 2. Wait for it to complete (may take 5-10 minutes)
-3. Find your app in the `dist` folder
-4. Double-click `OBS_Calibrator.exe` to run
+3. **Optional:** When prompted, choose to clean up build files (saves ~2GB)
+4. Find your app in the `dist` folder
+5. Double-click `OBS_Calibrator.exe` to run
 
 **Mac:**
 1. Open Terminal in the project folder
 2. Run: `chmod +x build_installer.sh`
 3. Run: `./build_installer.sh`
 4. Wait for it to complete (may take 5-10 minutes)
-5. Find your app in the `dist` folder
-6. Double-click `OBS_Calibrator.app` to run
+5. **Optional:** When prompted, choose to clean up build files (saves ~2GB)
+6. Find your app in the `dist` folder
+7. Double-click `OBS_Calibrator.app` to run
 
 ## 🔧 Path 2: Run from Source (If Path 1 fails)
 
@@ -106,9 +108,10 @@ cd OBS_Calibrator
 
 ## 📋 What Each Script Does
 
-- **`build_installer.*`**: Creates a standalone application you can run anywhere
+- **`build_installer.*`**: Creates a standalone application you can run anywhere (includes optional cleanup)
 - **`install_dependencies.*`**: Sets up a safe Python environment with all required packages
 - **`run_from_source.*`**: Runs the app from Python source code (automatically handles environment)
+- **`cleanup_build.*`**: Removes build artifacts to save disk space (~2GB) while keeping your app
 
 ## ✅ Quick Test
 
@@ -178,9 +181,10 @@ OBS_Calibrator/
 ├── qtquickcontrols2.conf     # Qt theme configuration
 ├── OBS_Calibration_WindowContent/  # QML user interface files
 ├── Python/autogen/           # Auto-generated settings
-├── build_installer.*         # Path 1: Build standalone app
+├── build_installer.*         # Path 1: Build standalone app (with cleanup)
 ├── install_dependencies.*    # Path 2: Install dependencies
 ├── run_from_source.*         # Path 2: Run from source
+├── cleanup_build.*           # Remove build files to save space
 ├── README.md                 # This file
 └── TROUBLESHOOTING.md        # Detailed troubleshooting guide
 ```

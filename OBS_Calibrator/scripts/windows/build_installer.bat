@@ -53,10 +53,15 @@ if %PYTHON_MAJOR% equ 3 if %PYTHON_MINOR% lss 12 (
 
 echo [SUCCESS] Python %PYTHON_VERSION% detected
 
+REM Get the project root directory (two levels up from scripts\windows\)
+set "SCRIPT_DIR=%~dp0"
+for %%A in ("%SCRIPT_DIR%..\..\.") do set "PROJECT_ROOT=%%~fA"
+cd /d "%PROJECT_ROOT%"
+
 REM Check if we're in the right directory
-if not exist "OBS_Calibrator.py" (
-    echo [ERROR] OBS_Calibrator.py not found!
-    echo Please run this script from the OBS_Calibrator directory.
+if not exist "src\OBS_Calibrator.py" (
+    echo [ERROR] src\OBS_Calibrator.py not found!
+    echo Project structure error. Expected to find src\OBS_Calibrator.py
     echo.
     pause
     exit /b 1
@@ -109,13 +114,13 @@ echo [SUCCESS] Dependencies installed successfully
 
 REM Build application with PyInstaller
 echo [INFO] Building standalone application...
-if not exist "OBS_Calibrator.spec" (
-    echo [ERROR] OBS_Calibrator.spec not found!
+if not exist "build_config\OBS_Calibrator.spec" (
+    echo [ERROR] build_config\OBS_Calibrator.spec not found!
     pause
     exit /b 1
 )
 
-pyinstaller --noconfirm OBS_Calibrator.spec
+pyinstaller --noconfirm build_config\OBS_Calibrator.spec
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to build application!
     echo Check the console output above for details.
@@ -143,6 +148,59 @@ if exist "dist\OBS_Calibrator\OBS_Calibrator.exe" (
 
 REM Deactivate virtual environment
 call venv\Scripts\deactivate.bat
+
+echo.
+echo ==============================================
+echo [SUCCESS] Build completed successfully!
+echo ==============================================
+echo.
+
+REM Offer to clean up build artifacts
+echo The application has been built successfully.
+echo.
+echo Would you like to clean up build artifacts to save disk space?
+echo This will remove:
+echo   - Virtual environment (venv\)
+echo   - Build files (build\)
+echo   - Python cache (__pycache__\)
+echo   - Temporary distribution files
+echo.
+echo This will KEEP your application and source code.
+echo.
+
+set /p CLEANUP="Clean up build artifacts? (y/N): "
+if /i "%CLEANUP%"=="y" (
+    echo.
+    echo [INFO] Starting cleanup...
+    
+    REM Remove virtual environment
+    if exist "venv" (
+        echo [INFO] Removing virtual environment...
+        rmdir /s /q venv
+    )
+    
+    REM Remove build directory
+    if exist "build" (
+        echo [INFO] Removing build artifacts...
+        rmdir /s /q build
+    )
+    
+    REM Remove Python cache
+    if exist "__pycache__" (
+        echo [INFO] Removing Python cache...
+        rmdir /s /q __pycache__
+    )
+    
+    REM Remove any .pyc files
+    echo [INFO] Removing compiled Python files...
+    del /s /q *.pyc 2>nul
+    del /s /q *.pyo 2>nul
+    
+    echo.
+    echo [SUCCESS] Cleanup completed!
+) else (
+    echo [INFO] Skipping cleanup. You can run cleanup_build.bat later if needed.
+)
 
 echo.
 echo ==============================================

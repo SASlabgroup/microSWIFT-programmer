@@ -7,7 +7,7 @@ import Qt.labs.platform 1.1
 Rectangle {
     id: rectangle
     width: Constants.width
-    height: 820
+    height: Constants.height  // Use the constant height (800)
     color: "#1b1a1a"
 
     // Expose the serial number as a property for external access
@@ -18,7 +18,7 @@ Rectangle {
         x: 0
         y: 33
         width: 800
-        height: 724
+        height: 700  // Reduced to make room for bottom controls
         rightPadding: 27
         leftPadding: 23
         layoutDirection: Qt.LeftToRight
@@ -47,7 +47,7 @@ Rectangle {
         id: findEquationButton
         objectName: "findEquationButton"
         x: 8
-        y: 780
+        y: 755  // Moved up to fit in 800px height
         width: 200
         height: 32
         text: qsTr("Find Equation")
@@ -59,7 +59,7 @@ Rectangle {
         id: saveSampleData
         objectName: "saveSampleData"
         x: 592
-        y: 780
+        y: 755  // Moved up to fit in 800px height
         width: 200
         height: 32
         text: qsTr("Save Sample Data")
@@ -102,7 +102,7 @@ Rectangle {
     Label {
         id: serialNumberLabel
         x: 342
-        y: 763
+        y: 738  // Moved up to fit in 800px height
         text: qsTr("Serial Number")
         font.family: "PT Mono"
     }
@@ -111,7 +111,7 @@ Rectangle {
         id: serialNumberTextField
         objectName: "serialNumberTextField"
         x: 342
-        y: 782
+        y: 757  // Moved up to fit in 800px height
         width: 117
         height: 30
         text: "0"

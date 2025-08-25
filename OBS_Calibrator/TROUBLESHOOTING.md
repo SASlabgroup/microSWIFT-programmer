@@ -56,16 +56,54 @@ chmod +x run_from_source.sh
 
 **Possible Solutions:**
 1. **Free up disk space** (build needs ~2GB temporarily)
-2. **Clean and retry:**
+2. **Use the cleanup script:**
    ```bash
-   rm -rf venv build dist
+   ./cleanup_build.sh  # macOS/Linux
+   cleanup_build.bat   # Windows
+   ```
+3. **Manual clean and retry:**
+   ```bash
+   rm -rf venv build dist __pycache__
    ./build_installer.sh
    ```
-3. **Try Path 2 instead:**
+4. **Try Path 2 instead:**
    ```bash
    ./install_dependencies.sh
    ./run_from_source.sh
    ```
+
+### 🔧 Disk Space Issues
+
+**Error:** "No space left on device" or build uses too much space
+
+**Solutions:**
+
+1. **Use automatic cleanup during build:**
+   - When `build_installer` completes, answer "y" to cleanup prompt
+   - This removes ~2GB of temporary build files
+   - Your app is preserved in the `dist` folder
+
+2. **Run cleanup manually:**
+   ```bash
+   # macOS/Linux
+   ./cleanup_build.sh
+   
+   # Windows
+   cleanup_build.bat
+   ```
+
+3. **What cleanup removes:**
+   - Virtual environment (`venv/`) - can be recreated
+   - Build artifacts (`build/`) - temporary files
+   - Python cache (`__pycache__/`) - regenerated automatically
+   - Unpacked files in `dist/` - keeping only the final app
+   - **Saves approximately 2GB of disk space**
+
+4. **What cleanup keeps:**
+   - Your source code files
+   - The final application (.app on Mac, .exe on Windows)
+   - Configuration files
+   - Documentation
 
 ## Application Issues
 
@@ -204,15 +242,17 @@ If you're still having issues:
 3. **Test in simulation mode** to isolate hardware vs software issues
 4. **Check system requirements:**
    - Python 3.12+ installed and in PATH
-   - At least 2GB free disk space for building
+   - At least 2GB free disk space for building (can be reclaimed with cleanup)
    - Administrative privileges may be needed for some operations
+5. **Low on disk space?** Run `cleanup_build.*` to free up ~2GB after building
 
 ## Quick Reference
 
 ### File Purposes
-- `build_installer.*` → Creates standalone app (Path 1)
+- `build_installer.*` → Creates standalone app with optional cleanup (Path 1)
 - `install_dependencies.*` → Sets up Python environment (Path 2)
 - `run_from_source.*` → Runs app from source code (Path 2)
+- `cleanup_build.*` → Removes build artifacts to save ~2GB disk space
 
 ### Recommended Installation Order
 1. Try `build_installer.*` first (creates standalone app)

@@ -26,14 +26,21 @@ except ImportError:
         from app_python.autogen.settings import url, import_paths
     except ImportError:
         # Fallback values
-        url = "OBS_Calibration_WindowContent/App.qml"
+        url = "ui/OBS_Calibration_WindowContent/App.qml"
         import_paths = ["."]
         print("Warning: Using fallback import paths")
 
 matplotlib.use("Agg")  # Non-GUI backend for safe offscreen plotting
 os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"
 # Force dark theme regardless of system settings
-os.environ["QT_QUICK_CONTROLS_CONF"] = "qtquickcontrols2.conf"
+# Look for conf file in ui directory
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    # Running from PyInstaller bundle
+    os.environ["QT_QUICK_CONTROLS_CONF"] = "qtquickcontrols2.conf"
+else:
+    # Running from source
+    conf_path = Path(__file__).parent.parent / "ui" / "qtquickcontrols2.conf"
+    os.environ["QT_QUICK_CONTROLS_CONF"] = str(conf_path)
 
 
 
@@ -471,14 +478,20 @@ if __name__ == '__main__':
         app_dir = Path(sys._MEIPASS)
         qml_file_path = app_dir / "OBS_Calibration_WindowContent" / "App.qml"
     else:
-        # Running from source
-        app_dir = Path(__file__).parent
-        qml_file_path = app_dir / "OBS_Calibration_WindowContent" / "App.qml"
+        # Running from source - need to look in ui directory
+        app_dir = Path(__file__).parent.parent  # Go up from src to project root
+        qml_file_path = app_dir / "ui" / "OBS_Calibration_WindowContent" / "App.qml"
     
     # Add import paths
-    engine.addImportPath(os.fspath(app_dir))
-    for path in import_paths:
-        engine.addImportPath(os.fspath(app_dir / path))
+    if getattr(sys, 'frozen', False):
+        engine.addImportPath(os.fspath(app_dir))
+        for path in import_paths:
+            engine.addImportPath(os.fspath(app_dir / path))
+    else:
+        # Running from source - add ui directory to import paths
+        engine.addImportPath(os.fspath(app_dir / "ui"))
+        for path in import_paths:
+            engine.addImportPath(os.fspath(app_dir / "ui" / path))
 
     sensor_thread = SensorThread()
     controller = UIController(sensor_thread)
