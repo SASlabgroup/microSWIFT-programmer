@@ -38,7 +38,7 @@ MANIFEST
 # before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
-!OBS_Calibrator.spec  # Keep the spec file if you want to track it
+!build_config/OBS_Calibrator.spec  # Keep the build spec file for reproducible builds
 
 # Build directories
 build/
