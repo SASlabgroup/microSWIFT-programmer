@@ -1,34 +1,153 @@
 # microSWIFT-programmer
 
-Installation and Usage:
+A configuration and programming tool for microSWIFT devices.
 
-1) [Install Python](https://www.python.org/downloads/)
-2) [Install STM32CubeProgrammer (Create an account if needed)](https://www.st.com/en/development-tools/stm32cubeprog.html)
-3) In a terminal, install Python dependencies
-```shell
-python -m pip install --upgrade pip
-python -m pip install PyQt6, PySerial, requests
-```
-4) Clone or download this repo to a location of your choice
-5) Open a terminal and navigate to where you cloned/downloaded this repo
-6) Run the program
-```shell
-python microSWIFT_programmer.py
-```
+## Prerequisites
 
-Notes:
+### Required Software
+1. **Python 3.12 or higher** - [Download Python](https://www.python.org/downloads/)
+2. **STM32CubeProgrammer** - [Download from ST](https://www.st.com/en/development-tools/stm32cubeprog.html) (Account required)
+   - The CLI version is used by this application
+   - Install to default location for automatic detection
 
-The application lists the version number in the window top banner. This repo is set up such that the default branch is the most recent version of the program. Please ensure the version you are running on your local machine matches the version listed in the default branch within this repo.
+## Quick Start
 
-On startup, the application downloads the V2.2 firmware binary file "microSWIFT_V2.2.elf" to the local "firmware" folder to ensure the most recent copy of firmware is burned to the device. If the application is unable to download this file (network issue, etc.), an error will appear indicating so. If this is to occur, users must ensure the firmware folder contains the most recent copy of "microSWIFT_V2.2.elf", which can be downloaded from [the microSWIFT binaries repo](https://github.com/SASlabgroup/microSWIFT-V2-Binaries/tree/main) under the V2.2 folder. 
+### Option 1: Build Standalone Application (Recommended)
 
-To bypass the firmware update functionality, pass the flag "--no_firmware_update":
-```shell
-python microSWIFT_programmer.py --no_firmware_update
+#### macOS
+```bash
+cd microSWIFT_Programmer
+./build_macos.sh
+# Application will be created at: dist/microSWIFT_Programmer.app
 ```
 
+#### Windows
+```cmd
+cd microSWIFT_Programmer
+build_windows.bat
+REM Application will be created at: dist\microSWIFT_Programmer.exe
+```
 
-When downloading a configuration file, there is no assigned default file extension. If the configuration is to be used to conduct an over-the-air configuration update, save the file with an extension of ".sbd" and ensure the full file length does not exceed 80 characters, including the file extension (ex. "microSWIFT_100_config.sbd").
+### Option 2: Run from Source
 
-When downloading a configuration file, no default file extension is applied. If holding for reference, save as ".bin" extansion. If using to conduct over-the-air configuration update, save as ".sbd" extension and ensure the file length with extension does not exceed 80 characters (ex: "microSWIFT_100_configuration.sbd").
+#### macOS/Linux
+```bash
+cd microSWIFT_Programmer
+./run_from_source.sh
+```
+
+#### Windows
+```cmd
+cd microSWIFT_Programmer
+run_from_source.bat
+```
+
+The run scripts automatically:
+- Create a virtual environment
+- Install all dependencies
+- Launch the application
+
+### Option 3: Manual Installation
+
+1) Clone or download this repository
+2) Navigate to the microSWIFT_Programmer directory
+3) Install dependencies:
+```bash
+python3 -m pip install --upgrade pip
+python3 -m pip install PyQt6 pyserial requests
+```
+4) Run the program:
+```bash
+python3 src/microSWIFT_Programmer.py
+```
+
+## Command Line Options
+
+### Bypass Firmware Update
+To skip automatic firmware download on startup:
+```bash
+# Standalone app on macOS
+open dist/microSWIFT_Programmer.app --args --no_firmware_update
+
+# Standalone app on Windows
+dist\microSWIFT_Programmer.exe --no_firmware_update
+
+# Running from source
+python3 src/microSWIFT_Programmer.py --no_firmware_update
+```
+
+## Usage Notes
+
+### Version Information
+The application version is displayed in the window title bar. Ensure you're using the latest version from this repository.
+
+### Firmware Updates
+On startup, the application automatically downloads the latest firmware (`microSWIFT_V2.2.elf`) from GitHub. If the download fails:
+1. Check your internet connection
+2. Manually download from [microSWIFT binaries repo](https://github.com/SASlabgroup/microSWIFT-V2-Binaries/tree/main/V2.2)
+3. Place the file in the `firmware/` directory
+
+### Configuration Files
+When saving configuration files:
+- For reference: Save with `.bin` extension
+- For over-the-air updates: Save with `.sbd` extension
+- Keep filename under 80 characters total (including extension)
+- Example: `microSWIFT_100_config.sbd`
+
+## Project Structure
+
+```
+microSWIFT_Programmer/
+├── src/                          # Source code
+│   └── microSWIFT_Programmer.py  # Main application
+├── firmware/                     # Firmware files
+│   ├── config.bin               # Configuration template
+│   └── zeros_64k.bin            # Initialization file
+├── resources/                    # Application resources
+│   ├── images/                  # Image assets
+│   └── ui/                      # UI files
+├── build_macos.sh               # macOS build script
+├── build_windows.bat            # Windows build script
+├── cleanup_macos.sh             # macOS cleanup script
+├── cleanup_windows.bat          # Windows cleanup script
+├── run_from_source.sh           # macOS/Linux source runner
+├── run_from_source.bat          # Windows source runner
+├── requirements.txt             # Python dependencies
+├── BUILD_INSTRUCTIONS.md        # Detailed build guide
+└── TROUBLESHOOTING.md           # Problem-solving guide
+```
+
+## Troubleshooting
+
+For common issues and solutions, see [TROUBLESHOOTING.md](microSWIFT_Programmer/TROUBLESHOOTING.md)
+
+## Development
+
+### Cleaning Build Artifacts
+
+```bash
+# macOS
+cd microSWIFT_Programmer
+./cleanup_macos.sh
+
+# Windows
+cd microSWIFT_Programmer
+cleanup_windows.bat
+```
+
+### Building for Distribution
+
+See [BUILD_INSTRUCTIONS.md](microSWIFT_Programmer/BUILD_INSTRUCTIONS.md) for detailed build instructions.
+
+## System Requirements
+
+- **Operating System:** macOS 10.13+, Windows 10+, or Linux
+- **Python:** 3.12 or higher
+- **RAM:** 4GB minimum
+- **Storage:** 500MB for application + firmware
+- **Hardware:** STLink V3 programmer for device programming
+
+## License
+
+Please refer to the repository license file for usage terms.
 
