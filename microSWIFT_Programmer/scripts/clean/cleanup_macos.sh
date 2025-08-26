@@ -26,7 +26,14 @@ if [ -d "build" ]; then
     rm -rf build
 fi
 
-# Note: Preserving dist directory to keep built applications
+# Remove PyInstaller intermediate build artifacts from dist directory
+# (Keep the .app and .dmg files but remove the onedir distribution)
+if [ -d "dist/microSWIFT_Programmer" ]; then
+    echo "Removing PyInstaller onedir build artifact from dist/..."
+    rm -rf "dist/microSWIFT_Programmer"
+fi
+
+# Note: Preserving dist directory with final built applications
 echo -e "${YELLOW}Note: Preserving dist/ directory with built applications${NC}"
 
 # Remove PyInstaller spec file work directories

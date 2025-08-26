@@ -22,7 +22,14 @@ if exist "build" (
     rmdir /s /q build
 )
 
-REM Note: Preserving dist directory to keep built applications
+REM Remove PyInstaller intermediate build artifacts from dist directory
+REM (Keep the .exe files but remove any onedir distribution directories)
+if exist "dist\microSWIFT_Programmer" (
+    echo Removing PyInstaller build artifact from dist/...
+    rmdir /s /q "dist\microSWIFT_Programmer"
+)
+
+REM Note: Preserving dist directory with final built applications
 echo Note: Preserving dist/ directory with built applications
 
 REM Remove Python cache directories
