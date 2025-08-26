@@ -19,7 +19,7 @@ from PyQt6.QtCore import pyqtSignal, QThread, Qt
 from datetime import datetime
 
 PROGRAMMER_MAJOR_VERSION = 1
-PROGRAMMER_MINOR_VERSION = 3
+PROGRAMMER_MINOR_VERSION = 4
 
 
 def get_resource_path(relative_path):
