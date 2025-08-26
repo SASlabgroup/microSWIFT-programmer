@@ -13,8 +13,6 @@ __pycache__/
 *.so
 *.egg
 *.egg-info/
-dist/
-build/
 *.manifest
 *.spec.bak
 .Python
@@ -33,7 +31,9 @@ env/
 *.spec.bak
 
 # Distribution / packaging
-build/
+# Ignore build directories but allow scripts/build/
+*/build/
+!scripts/build/
 dist/
 *.app
 *.exe
