@@ -8,7 +8,7 @@ Rectangle {
     id: rectangle
     width: Constants.width
     height: Constants.height  // Use the constant height (800)
-    // Remove hardcoded color to use system theme
+    color: palette.window  // Use system theme background color
 
     // Expose the serial number as a property for external access
     property string serialNumber: serialNumberTextField.text
@@ -144,8 +144,8 @@ Rectangle {
 
         Rectangle {
             anchors.fill: parent
-            color: "white"
-            border.color: "gray"
+            color: palette.window
+            border.color: palette.mid
             radius: 8
 
             Text {
@@ -158,6 +158,7 @@ Rectangle {
                 width: parent.width - 40
                 horizontalAlignment: Text.AlignHCenter
                 font.family: "PT Mono"
+                color: palette.windowText
             }
 
             Button {

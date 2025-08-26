@@ -7,8 +7,13 @@ QtObject {
 
     readonly property string relativeFontDirectory: "fonts"
 
-    // Replace with a default font or configure via Python
-    readonly property string defaultFontFamily: "PT Mono"
+    // Load PT Mono font from embedded file
+    readonly property FontLoader ptMonoFont: FontLoader {
+        source: "../fonts/PTMono-Regular.ttf"
+    }
+
+    // Use loaded font or fallback to system PT Mono
+    readonly property string defaultFontFamily: ptMonoFont.status === FontLoader.Ready ? ptMonoFont.name : "PT Mono, Consolas, Monaco, Menlo, monospace"
     readonly property int defaultFontSize: 14
 
     readonly property font font: Qt.font({

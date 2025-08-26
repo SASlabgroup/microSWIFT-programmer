@@ -23,6 +23,9 @@ data_files = [
     (str(PROJECT_ROOT / 'ui' / 'OBS_Calibration_Window'), 'OBS_Calibration_Window'),
     (str(PROJECT_ROOT / 'Python'), 'app_python'),  # Rename to avoid conflict
     
+    # Fonts directory - include all fonts for QML FontLoader
+    (str(PROJECT_ROOT / 'ui' / 'fonts'), 'ui/fonts'),
+    
     # Configuration files - place in multiple locations to ensure it's found
     (str(PROJECT_ROOT / 'ui' / 'qtquickcontrols2.conf'), '.'),
     (str(PROJECT_ROOT / 'ui' / 'qtquickcontrols2.conf'), 'ui'),

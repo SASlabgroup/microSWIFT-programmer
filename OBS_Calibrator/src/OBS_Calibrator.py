@@ -9,7 +9,8 @@ import numpy as np
 import shutil
 
 from PySide6.QtCore import QObject, QUrl, Slot, Signal
-from PySide6.QtGui import QGuiApplication, QIcon
+from PySide6.QtGui import QGuiApplication, QIcon, QPalette
+from PySide6.QtWidgets import QApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -31,7 +32,99 @@ except ImportError:
         print("Warning: Using fallback import paths")
 
 matplotlib.use("Agg")  # Non-GUI backend for safe offscreen plotting
+
+# Configure Qt Quick Controls to use Fusion style for cross-platform consistency
 os.environ["QT_QUICK_CONTROLS_STYLE"] = "Fusion"
+
+# System theme detection function
+def is_dark_theme():
+    """Detect if the system is using a dark theme."""
+    import platform
+    system = platform.system()
+    
+    if system == "Darwin":  # macOS
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["defaults", "read", "-g", "AppleInterfaceStyle"], 
+                capture_output=True, text=True, timeout=5
+            )
+            return "dark" in result.stdout.lower()
+        except:
+            pass
+    elif system == "Windows":
+        try:
+            import winreg
+            registry = winreg.ConnectRegistry(None, winreg.HKEY_CURRENT_USER)
+            key = winreg.OpenKey(registry, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize")
+            value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+            winreg.CloseKey(key)
+            return value == 0  # 0 = dark theme, 1 = light theme
+        except:
+            pass
+    elif system == "Linux":
+        try:
+            import subprocess
+            # Try GNOME settings
+            result = subprocess.run(
+                ["gsettings", "get", "org.gnome.desktop.interface", "gtk-theme"], 
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                return "dark" in result.stdout.lower()
+        except:
+            pass
+    
+    return False  # Default to light theme if detection fails
+
+def setup_fusion_palette(app, dark_theme=False):
+    """Configure Fusion style with appropriate colors for the system theme."""
+    app.setStyle("Fusion")
+    
+    palette = QPalette()
+    
+    if dark_theme:
+        # Dark theme colors for Fusion style
+        palette.setColor(QPalette.Window, "#353535")
+        palette.setColor(QPalette.WindowText, "#FFFFFF")
+        palette.setColor(QPalette.Base, "#2A2A2A")
+        palette.setColor(QPalette.AlternateBase, "#424242")
+        palette.setColor(QPalette.ToolTipBase, "#FFFFDC")
+        palette.setColor(QPalette.ToolTipText, "#000000")
+        palette.setColor(QPalette.Text, "#FFFFFF")
+        palette.setColor(QPalette.Button, "#404040")
+        palette.setColor(QPalette.ButtonText, "#FFFFFF")
+        palette.setColor(QPalette.BrightText, "#FF0000")
+        palette.setColor(QPalette.Link, "#4A90E2")
+        palette.setColor(QPalette.Highlight, "#4A90E2")
+        palette.setColor(QPalette.HighlightedText, "#000000")
+        
+        # Disabled colors
+        palette.setColor(QPalette.Disabled, QPalette.WindowText, "#808080")
+        palette.setColor(QPalette.Disabled, QPalette.Text, "#808080")
+        palette.setColor(QPalette.Disabled, QPalette.ButtonText, "#808080")
+    else:
+        # Light theme colors for Fusion style
+        palette.setColor(QPalette.Window, "#F0F0F0")
+        palette.setColor(QPalette.WindowText, "#000000")
+        palette.setColor(QPalette.Base, "#FFFFFF")
+        palette.setColor(QPalette.AlternateBase, "#F5F5F5")
+        palette.setColor(QPalette.ToolTipBase, "#FFFFDC")
+        palette.setColor(QPalette.ToolTipText, "#000000")
+        palette.setColor(QPalette.Text, "#000000")
+        palette.setColor(QPalette.Button, "#E1E1E1")
+        palette.setColor(QPalette.ButtonText, "#000000")
+        palette.setColor(QPalette.BrightText, "#FF0000")
+        palette.setColor(QPalette.Link, "#0000FF")
+        palette.setColor(QPalette.Highlight, "#0078D4")
+        palette.setColor(QPalette.HighlightedText, "#FFFFFF")
+        
+        # Disabled colors
+        palette.setColor(QPalette.Disabled, QPalette.WindowText, "#808080")
+        palette.setColor(QPalette.Disabled, QPalette.Text, "#808080")
+        palette.setColor(QPalette.Disabled, QPalette.ButtonText, "#808080")
+    
+    app.setPalette(palette)
 
 # Look for qtquickcontrols2.conf file
 def find_config_file():
@@ -518,7 +611,13 @@ def find_icon_file():
 
 
 if __name__ == '__main__':
-    app = QGuiApplication(sys.argv)
+    # Use QApplication instead of QGuiApplication for better widget support
+    app = QApplication(sys.argv)
+    
+    # Detect system theme and configure Fusion style
+    dark_theme = is_dark_theme()
+    print(f"Detected system theme: {'dark' if dark_theme else 'light'}")
+    setup_fusion_palette(app, dark_theme)
     
     # Set application icon
     icon_path = find_icon_file()
@@ -527,9 +626,6 @@ if __name__ == '__main__':
         print(f"Application icon set: {icon_path}")
     else:
         print("Warning: Application icon not found")
-    
-    # Use Fusion style (already set via environment variable)
-    # Let the system theme determine the colors
     
     engine = QQmlApplicationEngine()
 
