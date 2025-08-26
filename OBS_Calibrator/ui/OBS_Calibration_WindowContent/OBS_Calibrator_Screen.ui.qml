@@ -8,7 +8,7 @@ Rectangle {
     id: rectangle
     width: Constants.width
     height: Constants.height  // Use the constant height (800)
-    color: "#1b1a1a"
+    // Remove hardcoded color to use system theme
 
     // Expose the serial number as a property for external access
     property string serialNumber: serialNumberTextField.text

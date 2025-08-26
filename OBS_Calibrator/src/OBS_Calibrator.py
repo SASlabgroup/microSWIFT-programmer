@@ -9,7 +9,7 @@ import numpy as np
 import shutil
 
 from PySide6.QtCore import QObject, QUrl, Slot, Signal
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -214,7 +214,8 @@ class UIController(QObject):
                 stdev_spinbox.setProperty("textColor", "red")
                 self.cal_point_complete[self.active_component_index] = False
             else:
-                stdev_spinbox.setProperty("textColor", "white")
+                # Reset to default text color - let QML use its default
+                stdev_spinbox.setProperty("textColor", "")
                 self.cal_point_complete[self.active_component_index] = True
                 self.cal_points[self.active_component_index] = [mean, ntu_concentration.property("value")]
                 self.checkFindEquation()
@@ -246,7 +247,8 @@ class UIController(QObject):
         stdev_spinbox = component.findChild(QObject, "stdevSpinBox")
         if stdev_spinbox:
             stdev_spinbox.setProperty("value", 0)
-            stdev_spinbox.setProperty("textColor", "white")
+            # Reset to default text color - let QML use its default
+            stdev_spinbox.setProperty("textColor", "")
 
         self.cal_point_complete[index] = False
         self.checkFindEquation()
@@ -305,11 +307,30 @@ class UIController(QObject):
 
     @Slot(str)
     def saveSampleData(self, file_url):
-        if not file_url or not file_url.startswith("file://"):
-            print("No file selected or invalid path.")
+        if not file_url:
+            print("No file selected.")
             return
 
-        file_path = file_url.replace("file://", "")
+        # Handle different file URL formats in a cross-platform way
+        try:
+            # Use QUrl to properly handle file URLs on all platforms
+            from PySide6.QtCore import QUrl
+            url = QUrl(file_url)
+            if url.isLocalFile():
+                file_path = url.toLocalFile()
+            else:
+                # Fallback for edge cases
+                file_path = file_url
+        except:
+            # Manual fallback if QUrl fails
+            if file_url.startswith("file://"):
+                # Remove file:// prefix and handle both Windows and Unix formats
+                file_path = file_url[7:] if not file_url.startswith("file:///") else file_url[8:]
+            else:
+                file_path = file_url
+        
+        # Normalize path for all platforms
+        file_path = os.path.normpath(file_path)
         file_path = os.path.expanduser(file_path)
 
         if not file_path.strip():
@@ -387,8 +408,14 @@ class UIController(QObject):
         temp_path = os.path.join(tempfile.gettempdir(), "calibration_plot.png")
         self.plot_calibration_curve(x, y, model.coef_[0], model.intercept_, r_squared, temp_path)
 
+        # Convert to file:/// URL for QML Image component using QUrl for cross-platform compatibility
+        # This ensures proper URL formatting on Windows, macOS, and Linux
+        file_url = QUrl.fromLocalFile(temp_path).toString()
+        print(f"Plot saved to: {temp_path}")
+        print(f"Plot URL for QML: {file_url}")
+        
         # Tell QML to open the dialog and show this temp file
-        self.plotReady.emit(temp_path)
+        self.plotReady.emit(file_url)
 
     def plot_calibration_curve(self, x, y, slope, intercept, r2, save_path):
         # Offscreen figure
@@ -422,12 +449,33 @@ class UIController(QObject):
             print("No pending plot data.")
             return
 
-        if not file_url or not file_url.startswith("file://"):
-            print("Invalid file URL:", file_url)
+        if not file_url:
+            print("No file selected.")
             return
 
+        # Handle different file URL formats in a cross-platform way (same as saveSampleData)
+        try:
+            # Use QUrl to properly handle file URLs on all platforms
+            from PySide6.QtCore import QUrl
+            url = QUrl(file_url)
+            if url.isLocalFile():
+                file_path = url.toLocalFile()
+            else:
+                # Fallback for edge cases
+                file_path = file_url
+        except:
+            # Manual fallback if QUrl fails
+            if file_url.startswith("file://"):
+                # Remove file:// prefix and handle both Windows and Unix formats
+                file_path = file_url[7:] if not file_url.startswith("file:///") else file_url[8:]
+            else:
+                file_path = file_url
+        
+        # Normalize path for all platforms
+        file_path = os.path.normpath(file_path)
+        file_path = os.path.expanduser(file_path)
+
         x, y, slope, intercept, r2 = self._pending_plot_data
-        file_path = os.path.expanduser(file_url[7:])  # strip file://
 
         try:
             self.plot_calibration_curve(x, y, slope, intercept, r2, file_path)
@@ -446,53 +494,42 @@ class UIController(QObject):
             print(f"Error saving plot: {e}")
 
 
+def find_icon_file():
+    """Find the application icon file in various possible locations."""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # Running from PyInstaller bundle
+        possible_paths = [
+            Path(sys._MEIPASS) / "ui" / "OpenOBSlogo.png",
+            Path(sys._MEIPASS) / "OpenOBSlogo.png",
+            Path(os.getcwd()) / "ui" / "OpenOBSlogo.png",
+        ]
+    else:
+        # Running from source
+        possible_paths = [
+            Path(__file__).parent.parent / "ui" / "OpenOBSlogo.png",
+            Path(os.getcwd()) / "ui" / "OpenOBSlogo.png",
+        ]
+    
+    for path in possible_paths:
+        if path.exists():
+            return str(path.absolute())
+    
+    return None
+
+
 if __name__ == '__main__':
     app = QGuiApplication(sys.argv)
     
-    # Force dark theme at the application level with improved cross-platform palette
-    from PySide6.QtGui import QPalette, QColor
-    dark_palette = QPalette()
+    # Set application icon
+    icon_path = find_icon_file()
+    if icon_path:
+        app.setWindowIcon(QIcon(icon_path))
+        print(f"Application icon set: {icon_path}")
+    else:
+        print("Warning: Application icon not found")
     
-    # Base colors for dark theme
-    window_color = QColor(53, 53, 53)
-    base_color = QColor(25, 25, 25) 
-    alt_base_color = QColor(53, 53, 53)
-    button_color = QColor(53, 53, 53)
-    text_color = QColor(255, 255, 255)
-    bright_text_color = QColor(255, 0, 0)
-    link_color = QColor(42, 130, 218)
-    highlight_color = QColor(42, 130, 218)
-    
-    # Set colors for all color groups (Active, Disabled, Inactive)
-    for color_group in [QPalette.Active, QPalette.Disabled, QPalette.Inactive]:
-        dark_palette.setColor(color_group, QPalette.Window, window_color)
-        dark_palette.setColor(color_group, QPalette.WindowText, text_color)
-        dark_palette.setColor(color_group, QPalette.Base, base_color)
-        dark_palette.setColor(color_group, QPalette.AlternateBase, alt_base_color)
-        dark_palette.setColor(color_group, QPalette.ToolTipBase, QColor(0, 0, 0))
-        dark_palette.setColor(color_group, QPalette.ToolTipText, text_color)
-        dark_palette.setColor(color_group, QPalette.Text, text_color)
-        dark_palette.setColor(color_group, QPalette.Button, button_color)
-        dark_palette.setColor(color_group, QPalette.ButtonText, text_color)
-        dark_palette.setColor(color_group, QPalette.BrightText, bright_text_color)
-        dark_palette.setColor(color_group, QPalette.Link, link_color)
-        dark_palette.setColor(color_group, QPalette.Highlight, highlight_color)
-        dark_palette.setColor(color_group, QPalette.HighlightedText, QColor(0, 0, 0))
-        
-        # Additional colors for better Windows compatibility
-        dark_palette.setColor(color_group, QPalette.Light, QColor(60, 60, 60))
-        dark_palette.setColor(color_group, QPalette.Midlight, QColor(56, 56, 56))
-        dark_palette.setColor(color_group, QPalette.Dark, QColor(35, 35, 35))
-        dark_palette.setColor(color_group, QPalette.Mid, QColor(40, 40, 40))
-        dark_palette.setColor(color_group, QPalette.Shadow, QColor(20, 20, 20))
-        
-    # Slightly different colors for disabled state
-    disabled_text = QColor(120, 120, 120)
-    dark_palette.setColor(QPalette.Disabled, QPalette.WindowText, disabled_text)
-    dark_palette.setColor(QPalette.Disabled, QPalette.Text, disabled_text)
-    dark_palette.setColor(QPalette.Disabled, QPalette.ButtonText, disabled_text)
-    
-    app.setPalette(dark_palette)
+    # Use Fusion style (already set via environment variable)
+    # Let the system theme determine the colors
     
     engine = QQmlApplicationEngine()
 

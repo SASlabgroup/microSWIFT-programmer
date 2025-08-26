@@ -143,14 +143,22 @@ Frame {
             to: 65536
             font.pointSize: 12
             font.family: "PT Mono"
-            property color textColor: "white"
+            property var textColor: undefined
             up.indicator: Item {}
             down.indicator: Item {}
 
             contentItem: TextInput {
                 text: stdevSpinBox.value.toString()
                 font: stdevSpinBox.font
-                color: stdevSpinBox.enabled ? stdevSpinBox.textColor : stdevSpinBox.palette.disabled.text
+                color: {
+                    if (!stdevSpinBox.enabled) {
+                        return stdevSpinBox.palette.disabled.text
+                    } else if (stdevSpinBox.textColor === undefined || stdevSpinBox.textColor === null || stdevSpinBox.textColor === "") {
+                        return stdevSpinBox.palette.text
+                    } else {
+                        return stdevSpinBox.textColor
+                    }
+                }
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 readOnly: true

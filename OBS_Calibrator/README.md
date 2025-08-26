@@ -11,7 +11,8 @@ A professional PySide6-based application for calibrating Optical Backscatter (OB
 - **Automatic simulation mode** when hardware is not available
 - **Data export** to CSV format
 - **Calibration plot generation** and export
-- **Cross-platform support** (Windows, macOS)
+- **Professional application icon** across all platforms
+- **Cross-platform support** (Windows, macOS, Linux)
 
 ## System Requirements
 
@@ -22,6 +23,7 @@ A professional PySide6-based application for calibrating Optical Backscatter (OB
 ### Supported Platforms
 - **Windows 10/11** (x86-64)
 - **macOS** (Intel and Apple Silicon)
+- **Linux** (Ubuntu 20.04+, similar distributions)
 
 ### Hardware (Optional)
 - **VCNL4010 proximity sensor** via I2C
@@ -115,7 +117,9 @@ cd OBS_Calibrator
 - **`scripts/[platform]/build_installer.*`**: Creates a standalone application (includes optional cleanup)
 - **`scripts/[platform]/install_dependencies.*`**: Sets up Python environment with all required packages
 - **`scripts/[platform]/run_from_source.*`**: Runs the app from Python source code
-- **`scripts/[platform]/cleanup_build.*`**: Removes build artifacts to save disk space (~2GB)
+- **`cleanup.sh` / `cleanup.bat`**: Removes build artifacts while keeping the built application
+  - Use `cleanup.bat` (Windows) or `./cleanup.sh` (macOS/Linux) to remove temporary build files
+  - Use `cleanup.bat full` to remove everything including the built application
 
 ## ✅ Quick Test
 
