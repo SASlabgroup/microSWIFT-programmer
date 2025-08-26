@@ -27,6 +27,9 @@ data_files = [
     (str(PROJECT_ROOT / 'ui' / 'qtquickcontrols2.conf'), '.'),
     (str(PROJECT_ROOT / 'ui' / 'qtquickcontrols2.conf'), 'ui'),
     
+    # Application icon for window (PNG for QIcon)
+    (str(PROJECT_ROOT / 'ui' / 'OpenOBSlogo.png'), 'ui'),
+    
     # Requirements file for reference
     (str(PROJECT_ROOT / 'requirements.txt'), '.'),
     
@@ -149,7 +152,7 @@ if IS_WINDOWS:
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
-        icon=str(PROJECT_ROOT / 'ui' / 'OpenOBSlogo.ico'),
+        icon=str(PROJECT_ROOT / 'ui' / 'OpenOBSlogo_new.ico'),
     )
     
     coll = COLLECT(

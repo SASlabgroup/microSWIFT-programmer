@@ -9,7 +9,7 @@ import numpy as np
 import shutil
 
 from PySide6.QtCore import QObject, QUrl, Slot, Signal
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -480,8 +480,39 @@ class UIController(QObject):
             print(f"Error saving plot: {e}")
 
 
+def find_icon_file():
+    """Find the application icon file in various possible locations."""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # Running from PyInstaller bundle
+        possible_paths = [
+            Path(sys._MEIPASS) / "ui" / "OpenOBSlogo.png",
+            Path(sys._MEIPASS) / "OpenOBSlogo.png",
+            Path(os.getcwd()) / "ui" / "OpenOBSlogo.png",
+        ]
+    else:
+        # Running from source
+        possible_paths = [
+            Path(__file__).parent.parent / "ui" / "OpenOBSlogo.png",
+            Path(os.getcwd()) / "ui" / "OpenOBSlogo.png",
+        ]
+    
+    for path in possible_paths:
+        if path.exists():
+            return str(path.absolute())
+    
+    return None
+
+
 if __name__ == '__main__':
     app = QGuiApplication(sys.argv)
+    
+    # Set application icon
+    icon_path = find_icon_file()
+    if icon_path:
+        app.setWindowIcon(QIcon(icon_path))
+        print(f"Application icon set: {icon_path}")
+    else:
+        print("Warning: Application icon not found")
     
     # Use Fusion style (already set via environment variable)
     # Let the system theme determine the colors
