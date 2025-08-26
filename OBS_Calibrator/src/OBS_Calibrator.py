@@ -311,18 +311,25 @@ class UIController(QObject):
             print("No file selected.")
             return
 
-        # Handle different file URL formats
-        if file_url.startswith("file:///"):
-            # Windows format: file:///C:/path/to/file
-            file_path = file_url[8:]  # Remove "file:///"
-        elif file_url.startswith("file://"):
-            # Unix format: file:///path/to/file
-            file_path = file_url[7:]  # Remove "file://"
-        else:
-            # Assume it's already a plain path
-            file_path = file_url
+        # Handle different file URL formats in a cross-platform way
+        try:
+            # Use QUrl to properly handle file URLs on all platforms
+            from PySide6.QtCore import QUrl
+            url = QUrl(file_url)
+            if url.isLocalFile():
+                file_path = url.toLocalFile()
+            else:
+                # Fallback for edge cases
+                file_path = file_url
+        except:
+            # Manual fallback if QUrl fails
+            if file_url.startswith("file://"):
+                # Remove file:// prefix and handle both Windows and Unix formats
+                file_path = file_url[7:] if not file_url.startswith("file:///") else file_url[8:]
+            else:
+                file_path = file_url
         
-        # Normalize path for Windows
+        # Normalize path for all platforms
         file_path = os.path.normpath(file_path)
         file_path = os.path.expanduser(file_path)
 
@@ -446,18 +453,25 @@ class UIController(QObject):
             print("No file selected.")
             return
 
-        # Handle different file URL formats (same as saveSampleData)
-        if file_url.startswith("file:///"):
-            # Windows format: file:///C:/path/to/file
-            file_path = file_url[8:]  # Remove "file:///"
-        elif file_url.startswith("file://"):
-            # Unix format: file:///path/to/file
-            file_path = file_url[7:]  # Remove "file://"
-        else:
-            # Assume it's already a plain path
-            file_path = file_url
+        # Handle different file URL formats in a cross-platform way (same as saveSampleData)
+        try:
+            # Use QUrl to properly handle file URLs on all platforms
+            from PySide6.QtCore import QUrl
+            url = QUrl(file_url)
+            if url.isLocalFile():
+                file_path = url.toLocalFile()
+            else:
+                # Fallback for edge cases
+                file_path = file_url
+        except:
+            # Manual fallback if QUrl fails
+            if file_url.startswith("file://"):
+                # Remove file:// prefix and handle both Windows and Unix formats
+                file_path = file_url[7:] if not file_url.startswith("file:///") else file_url[8:]
+            else:
+                file_path = file_url
         
-        # Normalize path for Windows
+        # Normalize path for all platforms
         file_path = os.path.normpath(file_path)
         file_path = os.path.expanduser(file_path)
 
