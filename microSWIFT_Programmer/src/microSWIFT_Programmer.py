@@ -929,18 +929,50 @@ class ProgrammerApp(QMainWindow):
         ports = serial.tools.list_ports.comports()
 
         stlink_ports = []
+        
+        # STMicroelectronics VID and known ST-Link PIDs
+        STMICRO_VID = 0x0483
+        STLINK_PIDS = {
+            0x3744: "ST-LINK/V1",
+            0x3748: "ST-LINK/V2", 
+            0x374A: "ST-LINK/V2",
+            0x374B: "ST-LINK/V2-1",
+            0x3752: "ST-LINK/V2-1",
+            0x3753: "ST-LINK/V3 (bootloader)",
+            0x3754: "ST-LINK/V3",
+            0x3755: "ST-LINK/V3", 
+            0x3757: "ST-LINK/V3 MINIE",
+            0x3758: "ST-LINK/V3 SET"
+        }
 
         for port in ports:
-            # Check if the port is an STLINK
-            if "STLINK" in port.description.upper():
+            # Method 1: Check if the port description contains STLINK (works on macOS/Linux)
+            if "STLINK" in port.description.upper() or "ST-LINK" in port.description.upper():
                 stlink_ports.append(port.device)
                 break
+                
+        # Method 2: If no STLINK found by description, check by VID/PID (works on Windows)
+        if not stlink_ports:
+            for port in ports:
+                # Check VID/PID attributes (most reliable method)
+                if (hasattr(port, 'vid') and hasattr(port, 'pid') and 
+                    port.vid == STMICRO_VID and port.pid in STLINK_PIDS):
+                    stlink_ports.append(port.device)
+                    break
 
         if stlink_ports:
             for device in stlink_ports:
+                # Determine which ST-Link model was detected
+                stlink_model = "ST-Link"
+                for port in ports:
+                    if port.device == device:
+                        if hasattr(port, 'pid') and port.pid in STLINK_PIDS:
+                            stlink_model = STLINK_PIDS[port.pid]
+                        break
+                
                 # Keep status color for visibility
                 self.devicePortLabel.setStyleSheet("font-size: 14px; color: green; font-weight: bold;")
-                self.devicePortLabel.setText(f"STLink V3 found on port {device}")
+                self.devicePortLabel.setText(f"{stlink_model} found on port {device}")
                 self.device_connected = True
                 self.stlink_port = device
                 break
