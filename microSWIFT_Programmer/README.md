@@ -192,13 +192,19 @@ scripts\clean\cleanup_windows.bat
 ```
 
 This removes:
-- Build and dist directories
-- Python cache files
-- Virtual environments
-- Generated executables
+- Build directory (temporary build artifacts)
+- Python cache files (__pycache__, *.pyc, *.pyo)
+- Virtual environments (.venv, venv)
+- Launcher scripts
 - Log files
+- macOS .DS_Store files (macOS only)
 
-**Note:** Source files and configurations are preserved.
+**Preserved:**
+- dist/ directory with built applications (.app, .dmg, .exe)
+- Source files and configurations
+- Firmware files
+
+**Note:** To completely remove built applications, manually delete the dist/ directory.
 
 ### Python Dependencies
 

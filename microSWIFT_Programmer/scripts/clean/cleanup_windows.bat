@@ -16,16 +16,14 @@ cd /d "%SCRIPT_DIR%\..\.."
 echo Cleaning build artifacts...
 echo.
 
-REM Remove PyInstaller build directories
+REM Remove PyInstaller build directory
 if exist "build" (
     echo Removing build directory...
     rmdir /s /q build
 )
 
-if exist "dist" (
-    echo Removing dist directory...
-    rmdir /s /q dist
-)
+REM Note: Preserving dist directory to keep built applications
+echo Note: Preserving dist/ directory with built applications
 
 REM Remove Python cache directories
 if exist "__pycache__" (
@@ -52,11 +50,8 @@ if exist "venv" (
     rmdir /s /q venv
 )
 
-REM Remove executable files
-if exist "*.exe" (
-    echo Removing executable files...
-    del /f /q *.exe
-)
+REM Note: Preserving executable files in dist directory
+REM The actual built .exe is in dist/ which we're preserving
 
 REM Remove launcher scripts created by build
 if exist "run_microSWIFT_Programmer.bat" (
@@ -103,14 +98,18 @@ echo Cleanup completed!
 echo =========================================
 echo.
 echo The following items have been removed:
-echo   - Build and dist directories
+echo   - Build directory
 echo   - Python cache and compiled files
 echo   - Virtual environments
-echo   - Executable files
 echo   - Launcher scripts
 echo   - Log files
 echo   - Installer files
 echo.
-echo Source files and configurations have been preserved.
+echo The following items have been preserved:
+echo   - dist/ directory with built applications (.exe)
+echo   - Source files and configurations
+echo   - Firmware files
+echo.
+echo Note: To remove built applications, manually delete the dist/ directory
 echo.
 pause

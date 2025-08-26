@@ -20,16 +20,14 @@ cd "$PROJECT_ROOT"
 
 echo -e "${YELLOW}Cleaning build artifacts...${NC}"
 
-# Remove PyInstaller build directories
+# Remove PyInstaller build directory
 if [ -d "build" ]; then
     echo "Removing build directory..."
     rm -rf build
 fi
 
-if [ -d "dist" ]; then
-    echo "Removing dist directory..."
-    rm -rf dist
-fi
+# Note: Preserving dist directory to keep built applications
+echo -e "${YELLOW}Note: Preserving dist/ directory with built applications${NC}"
 
 # Remove PyInstaller spec file work directories
 if [ -d "__pycache__" ]; then
@@ -54,16 +52,8 @@ if [ -d "venv" ]; then
     rm -rf venv
 fi
 
-# Remove generated app bundles
-if [ -d "microSWIFT_Programmer.app" ]; then
-    echo "Removing microSWIFT_Programmer.app..."
-    rm -rf microSWIFT_Programmer.app
-fi
-
-if [ -d "microSWIFT_Programmer_Source.app" ]; then
-    echo "Removing microSWIFT_Programmer_Source.app..."
-    rm -rf microSWIFT_Programmer_Source.app
-fi
+# Note: Preserving app bundles in root directory (these shouldn't exist here anyway)
+# The actual built apps are in dist/ which we're preserving
 
 # Remove launcher scripts
 if [ -f "run_microSWIFT_Programmer.command" ]; then
@@ -94,12 +84,16 @@ fi
 echo -e "${GREEN}✓ Cleanup completed!${NC}"
 echo ""
 echo "The following items have been removed:"
-echo "  • Build and dist directories"
+echo "  • Build directory"
 echo "  • Python cache and compiled files"
 echo "  • Virtual environments"
-echo "  • Generated app bundles"
 echo "  • Launcher scripts"
 echo "  • Log files"
 echo "  • macOS .DS_Store files"
 echo ""
-echo "Source files and configurations have been preserved."
+echo "The following items have been preserved:"
+echo "  • dist/ directory with built applications (.app and .dmg)"
+echo "  • Source files and configurations"
+echo "  • Firmware files"
+echo ""
+echo -e "${YELLOW}To remove built applications, manually delete the dist/ directory${NC}"
