@@ -161,7 +161,7 @@ calibration_*.csv
 calibration_*.png
 *.csv
 *.png
-!ui/**/*.png  # Keep UI resource images
+!ui/*.png  # Keep UI resource images
 !resources/**/*.png  # Keep resource images
 
 # Temporary plot files
