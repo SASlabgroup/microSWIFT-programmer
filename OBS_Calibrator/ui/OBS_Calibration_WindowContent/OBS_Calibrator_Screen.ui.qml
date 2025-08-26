@@ -18,7 +18,7 @@ Rectangle {
         x: 0
         y: 33
         width: 800
-        height: 700  // Reduced to make room for bottom controls
+        height: 720  // Adjusted for 840px window height
         rightPadding: 27
         leftPadding: 23
         layoutDirection: Qt.LeftToRight
@@ -47,7 +47,7 @@ Rectangle {
         id: findEquationButton
         objectName: "findEquationButton"
         x: 8
-        y: 755  // Moved up to fit in 800px height
+        y: 755  // Back to original position
         width: 200
         height: 32
         text: qsTr("Find Equation")
@@ -59,7 +59,7 @@ Rectangle {
         id: saveSampleData
         objectName: "saveSampleData"
         x: 592
-        y: 755  // Moved up to fit in 800px height
+        y: 755  // Back to original position
         width: 200
         height: 32
         text: qsTr("Save Sample Data")
@@ -101,8 +101,8 @@ Rectangle {
 
     Label {
         id: serialNumberLabel
-        x: 342
-        y: 738  // Moved up to fit in 800px height
+        x: 300
+        y: 765  // Position below NTU components (which end around y:750)
         text: qsTr("Serial Number")
         font.family: "PT Mono"
     }
@@ -110,8 +110,8 @@ Rectangle {
     TextField {
         id: serialNumberTextField
         objectName: "serialNumberTextField"
-        x: 342
-        y: 757  // Moved up to fit in 800px height
+        x: 420
+        y: 760  // Inline with label, centered vertically
         width: 117
         height: 30
         text: "0"

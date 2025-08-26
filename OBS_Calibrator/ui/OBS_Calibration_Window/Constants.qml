@@ -3,7 +3,7 @@ import QtQuick
 
 QtObject {
     readonly property int width: 800
-    readonly property int height: 800
+    readonly property int height: 810
 
     readonly property string relativeFontDirectory: "fonts"
 
