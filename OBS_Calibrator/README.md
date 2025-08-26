@@ -1,6 +1,6 @@
 # OBS Calibrator
 
-A professional PySide6-based application for calibrating Optical Backscatter (OBS) sensors used in water quality monitoring. This application supports both hardware and simulation modes for development and field deployment.
+A PySide6-based application for calibrating Optical Backscatter (OBS) sensors. This application supports both hardware and simulation modes for development and field deployment.
 
 ## Features
 
@@ -12,6 +12,8 @@ A professional PySide6-based application for calibrating Optical Backscatter (OB
 - **Data export** to CSV format
 - **Calibration plot generation** and export
 - **Professional application icon** across all platforms
+- **Embedded PT Mono font** for consistent monospace display
+- **System theme integration** (automatic light/dark mode)
 - **Cross-platform support** (Windows, macOS, Linux)
 
 ## System Requirements
@@ -117,14 +119,13 @@ cd OBS_Calibrator
 - **`scripts/[platform]/build_installer.*`**: Creates a standalone application (includes optional cleanup)
 - **`scripts/[platform]/install_dependencies.*`**: Sets up Python environment with all required packages
 - **`scripts/[platform]/run_from_source.*`**: Runs the app from Python source code
-- **`cleanup.sh` / `cleanup.bat`**: Removes build artifacts while keeping the built application
-  - Use `cleanup.bat` (Windows) or `./cleanup.sh` (macOS/Linux) to remove temporary build files
-  - Use `cleanup.bat full` to remove everything including the built application
+- **`scripts/[platform]/cleanup_build.*`**: Removes build artifacts while keeping the built application
+  - Use `scripts\windows\cleanup_build.bat` (Windows) or `./scripts/unix/cleanup_build.sh` (macOS/Linux) to remove temporary build files
 
 ## ✅ Quick Test
 
 After installation, the application should:
-1. Open with a professional interface
+1. Open with the appropriate theme to match user OS setting
 2. Show "Hardware connected" or "No Device!" in the serial number field
 3. Allow you to configure calibration points
 4. Let you start sensor readings (real or simulated)
@@ -183,6 +184,8 @@ After installation, the application should:
 ### Project Structure
 ```
 OBS_Calibrator/
+├── .gitignore                   # Git ignore rules
+├── CHANGELOG.md                 # Version history
 ├── README.md                    # Project documentation
 ├── TROUBLESHOOTING.md           # Detailed help guide
 ├── requirements.txt             # Python dependencies
@@ -196,7 +199,11 @@ OBS_Calibrator/
 ├── ui/                          # User interface files
 │   ├── OBS_Calibration_Window/  # QML window definitions
 │   ├── OBS_Calibration_WindowContent/  # QML components
-│   └── qtquickcontrols2.conf   # Qt theme configuration
+│   ├── qtquickcontrols2.conf    # Qt theme configuration
+│   ├── OpenOBSlogo.png          # Application icon
+│   └── fonts/                   # Embedded fonts
+│       ├── OFL.txt              # Font license
+│       └── PTMono-Regular.ttf   # PT Mono monospace font
 │
 ├── scripts/                     # Platform-specific scripts
 │   ├── windows/                 # Windows batch files
@@ -215,7 +222,13 @@ OBS_Calibrator/
 │   ├── pyi_rth_blinka.py        # Runtime hook for hardware
 │   └── dmg_config.py            # macOS DMG configuration
 │
-└── Python/autogen/              # Auto-generated settings
+├── Python/autogen/              # Auto-generated settings
+│   └── settings.py              # Application settings
+│
+└── dist/                        # Built applications (after build)
+    ├── OBS_Calibrator.app       # macOS application bundle
+    └── OBS_Calibrator/          # Windows application folder
+        └── OBS_Calibrator.exe   # Windows executable
 ```
 
 ### Dependencies
