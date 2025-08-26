@@ -149,7 +149,7 @@ if IS_WINDOWS:
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
-        icon=None,  # Add icon path here if you have one
+        icon=str(PROJECT_ROOT / 'ui' / 'OpenOBSlogo.ico'),
     )
     
     coll = COLLECT(
@@ -195,7 +195,7 @@ elif IS_MACOS:
     app = BUNDLE(
         coll,
         name=f'{APP_NAME}.app',
-        icon=None,  # Add icon path here if you have one
+        icon=str(PROJECT_ROOT / 'ui' / 'OpenOBSlogo.png'),
         bundle_identifier='com.example.obs-calibrator',
         info_plist={
             'CFBundleDisplayName': 'OBS Calibrator',
