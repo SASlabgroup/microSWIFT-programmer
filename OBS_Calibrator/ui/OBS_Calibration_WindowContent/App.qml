@@ -17,7 +17,8 @@ Window {
     Connections {
         target: uiController
         function onPlotReady(path) {
-            calibrationPlotDialog.plotSource = "file://" + path
+            // Python already sends a complete file:/// URL, no need to add prefix
+            calibrationPlotDialog.plotSource = path
 
             // safely pull the serial number from main screen property
             calibrationPlotDialog.serial = mainScreen.serialNumber

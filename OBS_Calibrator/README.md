@@ -115,7 +115,9 @@ cd OBS_Calibrator
 - **`scripts/[platform]/build_installer.*`**: Creates a standalone application (includes optional cleanup)
 - **`scripts/[platform]/install_dependencies.*`**: Sets up Python environment with all required packages
 - **`scripts/[platform]/run_from_source.*`**: Runs the app from Python source code
-- **`scripts/[platform]/cleanup_build.*`**: Removes build artifacts to save disk space (~2GB)
+- **`cleanup.bat`**: Removes build artifacts while keeping the built application
+  - Use `cleanup.bat` to remove temporary build files
+  - Use `cleanup.bat full` to remove everything including the built application
 
 ## ✅ Quick Test
 
