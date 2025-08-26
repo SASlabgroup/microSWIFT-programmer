@@ -1,0 +1,122 @@
+@echo off
+setlocal
+
+REM microSWIFT_Programmer Windows Cleanup Script
+REM This script removes all build artifacts and temporary files
+
+echo =========================================
+echo microSWIFT_Programmer Cleanup Script
+echo =========================================
+echo.
+
+REM Get the project root directory (two levels up from scripts\clean\)
+set "SCRIPT_DIR=%~dp0"
+cd /d "%SCRIPT_DIR%\..\.."
+
+echo Cleaning build artifacts...
+echo.
+
+REM Remove PyInstaller build directory
+if exist "build" (
+    echo Removing build directory...
+    rmdir /s /q build
+)
+
+REM Remove PyInstaller intermediate build artifacts from dist directory
+REM (Keep the .exe files but remove any onedir distribution directories)
+if exist "dist\microSWIFT_Programmer" (
+    echo Removing PyInstaller build artifact from dist/...
+    rmdir /s /q "dist\microSWIFT_Programmer"
+)
+
+REM Note: Preserving dist directory with final built applications
+echo Note: Preserving dist/ directory with built applications
+
+REM Remove Python cache directories
+if exist "__pycache__" (
+    echo Removing __pycache__ directory...
+    rmdir /s /q __pycache__
+)
+
+REM Remove compiled Python files
+echo Removing compiled Python files...
+del /s /q *.pyc 2>nul
+del /s /q *.pyo 2>nul
+
+REM Remove all __pycache__ directories recursively
+for /d /r . %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d"
+
+REM Remove virtual environments
+if exist ".venv" (
+    echo Removing virtual environment...
+    rmdir /s /q .venv
+)
+
+if exist "venv" (
+    echo Removing venv directory...
+    rmdir /s /q venv
+)
+
+REM Note: Preserving executable files in dist directory
+REM The actual built .exe is in dist/ which we're preserving
+
+REM Remove launcher scripts created by build
+if exist "run_microSWIFT_Programmer.bat" (
+    echo Removing run_microSWIFT_Programmer.bat...
+    del /f /q run_microSWIFT_Programmer.bat
+)
+
+if exist "microSWIFT_Programmer_Source.vbs" (
+    echo Removing microSWIFT_Programmer_Source.vbs...
+    del /f /q microSWIFT_Programmer_Source.vbs
+)
+
+REM Remove log files
+echo Removing log files...
+del /s /q *.log 2>nul
+
+REM Remove PyInstaller work files
+if exist "*.spec.bak" (
+    echo Removing spec backup files...
+    del /f /q *.spec.bak
+)
+
+REM Remove NSIS installer files
+if exist "installer.nsi" (
+    echo Removing NSIS installer script...
+    del /f /q installer.nsi
+)
+
+REM Remove Python egg-info directories
+for /d %%i in (*egg-info) do (
+    echo Removing %%i...
+    rmdir /s /q "%%i"
+)
+
+REM Optional: Remove downloaded firmware (uncomment if desired)
+REM if exist "firmware\microSWIFT_V2.2.elf" (
+REM     echo Removing downloaded firmware...
+REM     del /f /q "firmware\microSWIFT_V2.2.elf"
+REM )
+
+echo.
+echo =========================================
+echo Cleanup completed!
+echo =========================================
+echo.
+echo The following items have been removed:
+echo   - Build directory
+echo   - Python cache and compiled files
+echo   - Virtual environments
+echo   - Launcher scripts
+echo   - Log files
+echo   - Installer files
+echo.
+echo The following items have been preserved:
+echo   - dist/ directory with built applications (.exe)
+echo   - Source files and configurations
+echo   - Firmware files
+echo.
+echo Note: To remove built applications, manually delete the dist/ directory
+echo.
+pause

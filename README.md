@@ -1,34 +1,26 @@
-# microSWIFT-programmer
+# microSWIFT Tools Repository
 
-Installation and Usage:
+This repository contains two desktop applications used in the microSWIFT workflow:
 
-1) [Install Python](https://www.python.org/downloads/)
-2) [Install STM32CubeProgrammer (Create an account if needed)](https://www.st.com/en/development-tools/stm32cubeprog.html)
-3) In a terminal, install Python dependencies
-```shell
-python -m pip install --upgrade pip
-python -m pip install PyQt6, PySerial, requests
-```
-4) Clone or download this repo to a location of your choice
-5) Open a terminal and navigate to where you cloned/downloaded this repo
-6) Run the program
-```shell
-python microSWIFT_programmer.py
-```
+- microSWIFT Programmer: A desktop app for configuring and programming microSWIFT devices (firmware loading, configuration management, and verification).
+- OBS Calibrator: A desktop app for calibrating Optical Backscatter (OBS) sensors, supporting both simulation and hardware modes.
 
-Notes:
+For installation and usage instructions, please refer to the README files in each application directory:
+- microSWIFT Programmer: microSWIFT_Programmer/README.md
+- OBS Calibrator: OBS_Calibrator/README.md
 
-The application lists the version number in the window top banner. This repo is set up such that the default branch is the most recent version of the program. Please ensure the version you are running on your local machine matches the version listed in the default branch within this repo.
+Additional documentation:
+- Sending SBD messages to a deployed microSWIFT: "Sending SBD messages to a modem.docx" (in this repository root)
 
-On startup, the application downloads the V2.2 firmware binary file "microSWIFT_V2.2.elf" to the local "firmware" folder to ensure the most recent copy of firmware is burned to the device. If the application is unable to download this file (network issue, etc.), an error will appear indicating so. If this is to occur, users must ensure the firmware folder contains the most recent copy of "microSWIFT_V2.2.elf", which can be downloaded from [the microSWIFT binaries repo](https://github.com/SASlabgroup/microSWIFT-V2-Binaries/tree/main) under the V2.2 folder. 
+Repository layout:
+- microSWIFT_Programmer/ — microSWIFT programming/configuration app
+- OBS_Calibrator/ — OBS sensor calibration app
+- firmware/ — shared firmware files and binaries (if provided)
+- CHANGE_LOG.txt — change history
 
-To bypass the firmware update functionality, pass the flag "--no_firmware_update":
-```shell
-python microSWIFT_programmer.py --no_firmware_update
-```
+For troubleshooting, please see:
+- microSWIFT_Programmer/TROUBLESHOOTING.md
+- OBS_Calibrator/TROUBLESHOOTING.md
 
-
-When downloading a configuration file, there is no assigned default file extension. If the configuration is to be used to conduct an over-the-air configuration update, save the file with an extension of ".sbd" and ensure the full file length does not exceed 80 characters, including the file extension (ex. "microSWIFT_100_config.sbd").
-
-When downloading a configuration file, no default file extension is applied. If holding for reference, save as ".bin" extansion. If using to conduct over-the-air configuration update, save as ".sbd" extension and ensure the file length with extension does not exceed 80 characters (ex: "microSWIFT_100_configuration.sbd").
+License: See the project's LICENSE files where provided.
 

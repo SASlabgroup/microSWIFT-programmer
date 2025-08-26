@@ -1,4 +1,97 @@
-# All PyCharm
+# IDE and OS specific
 .DS_Store
 .idea/
-.venv
+*.swp
+*.swo
+*~
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+*.manifest
+*.spec.bak
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec.bak
+
+# Distribution / packaging
+# Ignore build directories but allow scripts/build/
+*/build/
+!scripts/build/
+dist/
+*.app
+*.exe
+*.dmg
+*.pkg
+*.msi
+*.deb
+*.rpm
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Logs
+*.log
+logs/
+
+# Generated launcher scripts (from build process)
+microSWIFT_Programmer/run_microSWIFT_Programmer.command
+microSWIFT_Programmer/run_microSWIFT_Programmer.bat
+microSWIFT_Programmer/microSWIFT_Programmer_Source.vbs
+microSWIFT_Programmer/microSWIFT_Programmer_Source.app/
+microSWIFT_Programmer/installer.nsi
+microSWIFT_Programmer/microSWIFT_Programmer_Setup.exe
+
+# OBS_Calibrator build artifacts
+OBS_Calibrator/build/
+OBS_Calibrator/dist/
+OBS_Calibrator/.venv/
+OBS_Calibrator/__pycache__/
+OBS_Calibrator/*.app
+OBS_Calibrator/*.exe
+OBS_Calibrator/*.dmg
+OBS_Calibrator/run_OBS_Calibrator.command
+OBS_Calibrator/run_OBS_Calibrator.bat
+OBS_Calibrator/OBS_Calibrator_Source.vbs
+OBS_Calibrator/OBS_Calibrator_Source.app/
+
+# microSWIFT_Programmer build artifacts
+microSWIFT_Programmer/build/
+microSWIFT_Programmer/dist/
+microSWIFT_Programmer/.venv/
+microSWIFT_Programmer/__pycache__/
+microSWIFT_Programmer/*.app
+microSWIFT_Programmer/*.exe
+microSWIFT_Programmer/*.dmg
