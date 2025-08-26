@@ -126,7 +126,14 @@ class Worker(QThread):
 
         # Burn the firmware first
         try:
-            process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # On Windows, hide console windows from subprocess calls
+            startupinfo = None
+            if platform.system() == "Windows":
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+            
+            process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo)
 
             # Do other work while the subprocess is running
             while process.poll() is None:
@@ -160,7 +167,14 @@ class Worker(QThread):
 
             # Burn the configuration bytes
             try:
-                process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                # On Windows, hide console windows from subprocess calls
+                startupinfo = None
+                if platform.system() == "Windows":
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = subprocess.SW_HIDE
+                
+                process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo)
 
                 # Do other work while the subprocess is running
                 while process.poll() is None:
@@ -194,7 +208,14 @@ class Worker(QThread):
 
             # Burn the configuration bytes
             try:
-                process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                # On Windows, hide console windows from subprocess calls
+                startupinfo = None
+                if platform.system() == "Windows":
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = subprocess.SW_HIDE
+                
+                process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo)
 
                 # Do other work while the subprocess is running
                 while process.poll() is None:

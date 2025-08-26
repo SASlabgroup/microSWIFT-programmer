@@ -88,19 +88,6 @@ if exist "dist\microSWIFT_Programmer.exe" (
     )
     echo.
     
-    REM Optional: Create installer with NSIS if available
-    set /p "nsis_choice=Would you like to create an NSIS installer? (y/N): "
-    if /i "%nsis_choice%"=="y" (
-        where makensis >nul 2>&1
-        if %ERRORLEVEL% EQU 0 (
-            echo Creating NSIS installer...
-            REM Add NSIS installer creation here if needed
-            echo Note: NSIS installer creation not yet implemented
-        ) else (
-            echo Error: NSIS not found! Install from https://nsis.sourceforge.io/
-        )
-    )
-    
     REM Prompt for cleanup
     echo.
     set /p "cleanup_choice=Would you like to clean up build artifacts? (y/N): "
@@ -109,6 +96,15 @@ if exist "dist\microSWIFT_Programmer.exe" (
         call "%SCRIPT_DIR%\..\clean\cleanup_windows.bat"
         echo Cleanup completed
     )
+    
+    REM Build completed successfully - show final message
+    echo.
+    echo ======================================
+    echo Build completed successfully!
+    echo ======================================
+    echo.
+    pause
+    exit /b 0
     
 ) else (
     echo.
@@ -120,9 +116,4 @@ if exist "dist\microSWIFT_Programmer.exe" (
     exit /b 1
 )
 
-echo.
-echo ======================================
-echo Build completed successfully!
-echo ======================================
-echo.
-pause
+REM Script should not reach here - removed duplicate success message
