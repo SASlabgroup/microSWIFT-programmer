@@ -79,7 +79,11 @@ microSWIFT_Programmer/
 │   └── zeros_64k.bin            # Zero-fill binary
 │
 ├── resources/                    # Application resources
-│   ├── ui/                      # UI files (reserved for future)
+│   ├── specs/                   # PyInstaller spec files
+│   │   ├── microSWIFT_Programmer_macos.spec    # macOS spec
+│   │   └── microSWIFT_Programmer_windows.spec  # Windows spec
+│   ├── ui/                      # UI files
+│   │   └── programmer_main_window.ui  # Main window UI
 │   └── images/                  # Application images
 │       └── microSWIFT_pic.png   # Application icon
 │
@@ -95,11 +99,6 @@ microSWIFT_Programmer/
 │   └── clean/                   # Cleanup scripts
 │       ├── cleanup_macos.sh    # macOS cleanup script
 │       └── cleanup_windows.bat # Windows cleanup script
-│
-├── build/                        # Build configuration
-│   └── specs/                   # PyInstaller spec files
-│       ├── microSWIFT_Programmer_macos.spec    # macOS spec
-│       └── microSWIFT_Programmer_windows.spec  # Windows spec
 │
 ├── requirements.txt              # Python dependencies
 ├── README.md                     # This file

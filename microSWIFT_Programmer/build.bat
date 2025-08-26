@@ -1,4 +1,3 @@
 @echo off
-REM Convenience script to run the Windows build from root directory
-cd /d "%~dp0"
+REM Convenience script to run the Windows build script
 call scripts\build\build_windows.bat %*
