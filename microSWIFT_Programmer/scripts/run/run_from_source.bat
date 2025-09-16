@@ -45,7 +45,7 @@ python -c "import PyQt6" 2>nul
 if %errorlevel% neq 0 (
     echo Installing dependencies...
     python -m pip install --upgrade pip
-    pip install -r requirements.txt
+    python -m pip install -r requirements.txt
     echo Dependencies installed
     echo.
 ) else (
