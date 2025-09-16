@@ -1,0 +1,15 @@
+[project]
+name = "microswift-programmer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.10.5",
+    "numpy>=2.3.2",
+    "pyqt6>=6.9.1",
+    "pyserial>=3.5",
+    "pyside6>=6.9.1",
+    "requests>=2.32.5",
+]
+
