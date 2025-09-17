@@ -48,7 +48,7 @@ python -m pip install --upgrade pip >nul 2>&1
 
 REM Install dependencies
 echo Installing dependencies...
-pip install -q -r requirements.txt
+python -m pip install -q -r requirements.txt
 if %ERRORLEVEL% NEQ 0 (
     echo Error: Failed to install dependencies!
     pause
