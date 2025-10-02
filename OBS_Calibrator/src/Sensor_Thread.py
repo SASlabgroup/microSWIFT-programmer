@@ -20,6 +20,18 @@ except (ImportError, RuntimeError, OSError) as e:
     HARDWARE_AVAILABLE = False
 
 
+class ModifiedVCNL4010(adafruit_vcnl4010.VCNL4010):
+    VCNL4010_IRLED = 0x83
+
+    def __init__(self, i2c, led_current=200):
+        super().__init__(i2c)
+        self.set_led_current(led_current)
+
+    def set_led_current(self, value):
+        self._write_u8(self.VCNL4010_IRLED, value // 10)
+
+
+
 class SensorThread(QThread):
     proximity_read = Signal(int)
     finished = Signal(float, float)
@@ -46,7 +58,8 @@ class SensorThread(QThread):
         try:
             # Try to initialize I2C and sensor
             self.i2c = board.I2C()
-            self.sensor = adafruit_vcnl4010.VCNL4010(self.i2c)
+            self.sensor = ModifiedVCNL4010(self.i2c)
+            self.sensor.set_led_current(50)
             # Test a quick read to verify sensor is responding
             _ = self.sensor.proximity
             self.hardware_connected = True
@@ -56,7 +69,8 @@ class SensorThread(QThread):
             self.hardware_connected = False
             self.i2c = None
             self.sensor = None
-            
+
+
         self.hardware_status.emit(self.hardware_connected)
 
     def set_sample_count(self, count: int):
