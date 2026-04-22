@@ -49,30 +49,192 @@ def get_image_path(filename):
     return get_resource_path(os.path.join('resources', 'images', filename))
 
 
-def download_microSWIFT_firmware():
-    # Raw file URL on GitHub
-    url = "https://github.com/SASlabgroup/microSWIFT-V2-Binaries/raw/main/V2.2/microSWIFT_V2.2.elf"
+# Default firmware URL — used on startup and when the user clicks "Reset to default"
+DEFAULT_FIRMWARE_URL = "https://github.com/SASlabgroup/microSWIFT-V2-Binaries/raw/main/V2.2/microSWIFT_V2.2.elf"
 
-    # Define local path to save the file
+# Cap download size to prevent a bad URL from exhausting disk (50 MB)
+MAX_FIRMWARE_BYTES = 50 * 1024 * 1024
+
+
+def normalize_firmware_url(url):
+    """Rewrite common GitHub URL variants so they return the raw binary.
+
+    GitHub's 'blob' URL (what users get from the address bar when viewing a
+    file on github.com) returns an HTML page, not the file content. The 'raw'
+    form returns the actual bytes. We transparently rewrite blob->raw so users
+    can paste either one. Returns (normalized_url, was_rewritten).
+    """
+    if not url:
+        return url, False
+    stripped = url.strip()
+    # Only touch github.com URLs; leave raw.githubusercontent.com and other
+    # hosts alone.
+    if "://github.com/" in stripped and "/blob/" in stripped:
+        return stripped.replace("/blob/", "/raw/", 1), True
+    return stripped, False
+
+
+def validate_firmware_url(url):
+    """Check a URL looks reasonable for firmware download.
+
+    Returns (is_valid, error_message). Does not make any network calls.
+    """
+    from urllib.parse import urlparse
+
+    if url is None:
+        return False, "URL is empty."
+
+    url = url.strip()
+    if not url:
+        return False, "URL is empty."
+
+    try:
+        parsed = urlparse(url)
+    except Exception as e:
+        return False, "Could not parse URL: {e}".format(e=e)
+
+    if parsed.scheme not in ("http", "https"):
+        return False, ("URL must start with http:// or https:// "
+                       "(got '{s}').".format(s=parsed.scheme or "nothing"))
+
+    if not parsed.netloc:
+        return False, "URL is missing a host (e.g. github.com)."
+
+    # Extract filename from path. GitHub 'raw' URLs end in the filename.
+    filename = os.path.basename(parsed.path)
+    if not filename:
+        return False, "URL does not point to a file."
+
+    return True, ""
+
+
+def filename_from_url(url):
+    """Derive a local filename from a URL. Falls back to a generic name."""
+    from urllib.parse import urlparse
+    name = os.path.basename(urlparse(url).path)
+    if not name:
+        name = "firmware.bin"
+    return name
+
+
+def download_microSWIFT_firmware(url=None):
+    """Download firmware from `url` (defaults to DEFAULT_FIRMWARE_URL).
+
+    Returns (success, local_file_path, error_message). `local_file_path` is
+    populated even on failure (to the path that *would* have been used) so the
+    caller can display it; `error_message` is empty on success.
+    """
+    if url is None:
+        url = DEFAULT_FIRMWARE_URL
+
+    # Rewrite GitHub blob URLs to raw URLs so users can paste either form
+    url, _rewritten = normalize_firmware_url(url)
+
+    valid, err = validate_firmware_url(url)
+    if not valid:
+        return False, "", err
+
+    # Derive filename from the URL so user-supplied URLs save sensibly
+    filename = filename_from_url(url)
     firmware_dir = get_resource_path('firmware')
-    local_file_path = os.path.join(firmware_dir, "microSWIFT_V2.2.elf")
+    local_file_path = os.path.join(firmware_dir, filename)
 
     # Ensure the firmware directory exists
-    os.makedirs(firmware_dir, exist_ok=True)
+    try:
+        os.makedirs(firmware_dir, exist_ok=True)
+    except OSError as e:
+        return False, local_file_path, "Could not create firmware directory: {e}".format(e=e)
 
     try:
         # Add a timeout (in seconds)
         response = requests.get(url, stream=True, timeout=10)
         response.raise_for_status()  # Raise an error on bad HTTP status
 
+        # Catch the common mistake of pasting a GitHub "blob" URL or a link
+        # to an HTML page. If the server advertises HTML, the bytes won't be
+        # firmware no matter what the URL looks like.
+        content_type = response.headers.get("Content-Type", "").lower()
+        if "text/html" in content_type:
+            return False, local_file_path, (
+                "Server returned an HTML page, not a binary file "
+                "(Content-Type: {ct}). If this is a GitHub link, make sure "
+                "you are using the 'raw' URL, not the 'blob' view URL."
+            ).format(ct=content_type)
+
+        # If the server reports an oversized file up front, bail before writing
+        content_length = response.headers.get("Content-Length")
+        if content_length and content_length.isdigit() and int(content_length) > MAX_FIRMWARE_BYTES:
+            return False, local_file_path, (
+                "File is too large ({n} bytes, limit {limit}).".format(
+                    n=content_length, limit=MAX_FIRMWARE_BYTES))
+
         # Write the file (overwrite if exists)
+        downloaded = 0
+        first_bytes = b""
         with open(local_file_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
+                if not chunk:
+                    continue
+                if len(first_bytes) < 16:
+                    first_bytes += chunk[:16 - len(first_bytes)]
+                downloaded += len(chunk)
+                if downloaded > MAX_FIRMWARE_BYTES:
+                    # Clean up a partial download so we never flash a truncated file
+                    f.close()
+                    try:
+                        os.remove(local_file_path)
+                    except OSError:
+                        pass
+                    return False, local_file_path, "Download exceeded size limit."
                 f.write(chunk)
 
-        return True
-    except (requests.RequestException, requests.Timeout):
-        return False
+        # Sanity check: empty files are never valid firmware
+        if os.path.getsize(local_file_path) == 0:
+            try:
+                os.remove(local_file_path)
+            except OSError:
+                pass
+            return False, local_file_path, "Downloaded file is empty."
+
+        # Magic-byte sniff: detect HTML saved under a .elf/.bin name. This
+        # catches servers that return HTML without setting Content-Type, or
+        # proxies/captive-portals that intercept the request. We don't hard-
+        # require ELF magic because .bin files are raw binaries with no fixed
+        # header — but HTML never starts with a valid firmware header.
+        head = first_bytes.lstrip()[:16].lower()
+        html_markers = (b"<!doctype", b"<html", b"<head", b"<body", b"<?xml")
+        if any(head.startswith(m) for m in html_markers):
+            try:
+                os.remove(local_file_path)
+            except OSError:
+                pass
+            return False, local_file_path, (
+                "Downloaded file looks like an HTML page, not firmware. "
+                "If this is a GitHub link, use the 'raw' URL, not the 'blob' URL.")
+
+        # If the URL claims to be an .elf, we can additionally verify the ELF
+        # magic bytes (0x7F 'E' 'L' 'F'). Non-ELF extensions skip this check.
+        if filename.lower().endswith(".elf") and not first_bytes.startswith(b"\x7fELF"):
+            try:
+                os.remove(local_file_path)
+            except OSError:
+                pass
+            return False, local_file_path, (
+                "Downloaded .elf file is missing the ELF magic bytes. The URL "
+                "may be pointing at the wrong file or returning a redirect page.")
+
+        return True, local_file_path, ""
+    except requests.Timeout:
+        return False, local_file_path, "Download timed out after 10 seconds."
+    except requests.HTTPError as e:
+        status = e.response.status_code if e.response is not None else "unknown"
+        return False, local_file_path, "HTTP error {s} from server.".format(s=status)
+    except requests.ConnectionError:
+        return False, local_file_path, "Could not connect to server (check URL and network)."
+    except requests.RequestException as e:
+        return False, local_file_path, "Download failed: {e}".format(e=e)
+    except OSError as e:
+        return False, local_file_path, "Could not write file: {e}".format(e=e)
 
 
 class Worker(QThread):
@@ -82,6 +244,12 @@ class Worker(QThread):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        # Path to the firmware .elf/.bin to flash. Set via setFirmwarePath() before run().
+        self.firmware_path = get_firmware_path("microSWIFT_V2.2.elf")
+
+    def setFirmwarePath(self, path):
+        """Set the firmware binary to flash on the next run."""
+        self.firmware_path = path
 
     def run(self):
         firmwareBurnSuccessful = False
@@ -112,9 +280,16 @@ class Worker(QThread):
                 return
 
         # Get firmware paths
-        firmware_path = get_firmware_path("microSWIFT_V2.2.elf")
+        firmware_path = self.firmware_path
         config_path = get_firmware_path("config.bin")
         zeros_path = get_firmware_path("zeros_64k.bin")
+
+        # Bail out early if the firmware file isn't actually on disk
+        if not firmware_path or not os.path.isfile(firmware_path):
+            self.stderrAvailable.emit(
+                "Error: firmware file not found: {p}".format(p=firmware_path))
+            self.finished.emit()
+            return
 
         # Define the command to run STM32CubeProgrammer
         command = [
@@ -244,16 +419,19 @@ class ProgrammerApp(QMainWindow):
     stlink_port = ""
     configFilePath = None
 
-    def __init__(self, bypasss_firmware_update, firmware_updated):
+    def __init__(self, bypasss_firmware_update, firmware_updated, firmware_path=""):
         super().__init__()
         self.bypass_firmware_update = bypasss_firmware_update
         self.firmware_updated = firmware_updated
+        # Path to the firmware file currently queued for flashing. Set either by
+        # the initial download at startup or by the user clicking "Download".
+        self.firmware_path = firmware_path
         self.configFilePath = get_firmware_path("config.bin")
         self.setupUi()
 
     def setupUi(self):
         self.setObjectName("MainWindow")
-        self.resize(640, 800)
+        self.resize(640, 880)
         self.centralwidget = QtWidgets.QWidget()
         self.centralwidget.setObjectName("centralwidget")
         self.ctFrame = QtWidgets.QFrame(parent=self.centralwidget)
@@ -583,8 +761,51 @@ class ProgrammerApp(QMainWindow):
         self.turbidityNumSamplesSpinBox.setObjectName("turbidityNumSamplesSpinBox")
         self.turbiditySamplesHorizLayout.addWidget(self.turbidityNumSamplesSpinBox)
         self.turbidityVerticalLayout.addLayout(self.turbiditySamplesHorizLayout)
+
+        # --- Firmware URL input panel ---
+        self.firmwareUrlFrame = QtWidgets.QFrame(parent=self.centralwidget)
+        self.firmwareUrlFrame.setGeometry(QtCore.QRect(10, 570, 621, 75))
+        self.firmwareUrlFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
+        self.firmwareUrlFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
+        self.firmwareUrlFrame.setObjectName("firmwareUrlFrame")
+
+        self.firmwareUrlVertLayoutWidget = QtWidgets.QWidget(parent=self.firmwareUrlFrame)
+        self.firmwareUrlVertLayoutWidget.setGeometry(QtCore.QRect(8, 5, 605, 65))
+        self.firmwareUrlVertLayout = QtWidgets.QVBoxLayout(self.firmwareUrlVertLayoutWidget)
+        self.firmwareUrlVertLayout.setContentsMargins(0, 0, 0, 0)
+        self.firmwareUrlVertLayout.setSpacing(2)
+
+        # Row 1: URL entry + buttons
+        self.firmwareUrlRow = QtWidgets.QHBoxLayout()
+        self.firmwareUrlLabel = QtWidgets.QLabel(parent=self.firmwareUrlVertLayoutWidget)
+        self.firmwareUrlLabel.setObjectName("firmwareUrlLabel")
+        self.firmwareUrlRow.addWidget(self.firmwareUrlLabel)
+
+        self.firmwareUrlLineEdit = QtWidgets.QLineEdit(parent=self.firmwareUrlVertLayoutWidget)
+        self.firmwareUrlLineEdit.setObjectName("firmwareUrlLineEdit")
+        self.firmwareUrlLineEdit.setText(DEFAULT_FIRMWARE_URL)
+        self.firmwareUrlLineEdit.setClearButtonEnabled(True)
+        self.firmwareUrlRow.addWidget(self.firmwareUrlLineEdit, stretch=1)
+
+        self.useUrlButton = QtWidgets.QPushButton(parent=self.firmwareUrlVertLayoutWidget)
+        self.useUrlButton.setObjectName("useUrlButton")
+        self.firmwareUrlRow.addWidget(self.useUrlButton)
+
+        self.resetUrlButton = QtWidgets.QPushButton(parent=self.firmwareUrlVertLayoutWidget)
+        self.resetUrlButton.setObjectName("resetUrlButton")
+        self.firmwareUrlRow.addWidget(self.resetUrlButton)
+
+        self.firmwareUrlVertLayout.addLayout(self.firmwareUrlRow)
+
+        # Row 2: active firmware file display (always shows what will be flashed)
+        self.activeFirmwareLabel = QtWidgets.QLabel(parent=self.firmwareUrlVertLayoutWidget)
+        self.activeFirmwareLabel.setObjectName("activeFirmwareLabel")
+        self.activeFirmwareLabel.setWordWrap(True)
+        self.activeFirmwareLabel.setStyleSheet("font-size: 11px;")
+        self.firmwareUrlVertLayout.addWidget(self.activeFirmwareLabel)
+
         self.statusTextEdit = QtWidgets.QTextEdit(parent=self.centralwidget)
-        self.statusTextEdit.setGeometry(QtCore.QRect(10, 570, 621, 221))
+        self.statusTextEdit.setGeometry(QtCore.QRect(10, 650, 621, 221))
         self.statusTextEdit.setObjectName("statusTextEdit")
         self.setCentralWidget(self.centralwidget)
 
@@ -620,6 +841,11 @@ class ProgrammerApp(QMainWindow):
         self.turbidityMatchGNSSCheckbox.setText(_translate("MainWindow", "Match GNSS period"))
         self.turbiditySerialNumberLabel.setText(_translate("MainWindow", "Serial Number"))
         self.turbidityNumSamplesLabel.setText(_translate("MainWindow", "Number of samples @ 1Hz"))
+        self.firmwareUrlLabel.setText(_translate("MainWindow", "Firmware URL:"))
+        self.useUrlButton.setText(_translate("MainWindow", "Download"))
+        self.resetUrlButton.setText(_translate("MainWindow", "Reset to default"))
+        self.activeFirmwareLabel.setText(
+            _translate("MainWindow", "Active firmware: (none — download a file to continue)"))
 
     def adjust_font_color_based_on_background(self, text_edit: QTextEdit):
         """Adjusts font color in a QTextEdit based on background color."""
@@ -719,6 +945,10 @@ class ProgrammerApp(QMainWindow):
             self.appendText("Firmware successfully updated from GitHub.")
         else:
             self.appendError("Unable to pull firmware from GitHub!")
+
+        # Initialize the "active firmware file" display and Worker path based
+        # on what actually exists on disk after startup.
+        self.updateActiveFirmwareDisplay()
 
     def saveConfigAsFile(self):
         file_dialog = QFileDialog(self)
@@ -861,6 +1091,11 @@ class ProgrammerApp(QMainWindow):
         self.verifyButton.clicked.connect(self.verifySettings)
         self.programButton.clicked.connect(self.programDevice)
         self.downloadConfigFile.clicked.connect(self.saveConfigAsFile)
+
+        # Firmware URL buttons
+        self.useUrlButton.clicked.connect(self.onUseUrlClicked)
+        self.resetUrlButton.clicked.connect(self.onResetUrlClicked)
+        self.firmwareUrlLineEdit.returnPressed.connect(self.onUseUrlClicked)
 
         self.lightNumSamplesSpinBox.valueChanged.connect(self.resetVerifyButton)
         self.lightGainComboBox.currentIndexChanged.connect(self.resetVerifyButton)
@@ -1103,6 +1338,82 @@ class ProgrammerApp(QMainWindow):
 
         self.statusTextEdit.append(string)
 
+    def updateActiveFirmwareDisplay(self):
+        """Refresh the 'Active firmware' label and gate the Program button on it.
+
+        The Program button should only be usable if we actually have a firmware
+        file on disk to flash.
+        """
+        path = self.firmware_path
+        if path and os.path.isfile(path):
+            size_kb = os.path.getsize(path) / 1024.0
+            self.activeFirmwareLabel.setText(
+                "Active firmware: {p}  ({kb:.1f} KB)".format(p=path, kb=size_kb))
+            self.activeFirmwareLabel.setStyleSheet(
+                "font-size: 11px; color: #0a7a2a;")
+            # Hand the path to the worker so the next Program click uses it
+            self.worker.setFirmwarePath(path)
+        else:
+            self.activeFirmwareLabel.setText(
+                "Active firmware: (none — download a file to continue)")
+            self.activeFirmwareLabel.setStyleSheet(
+                "font-size: 11px; color: #a00;")
+            # No firmware on disk: force-disable the Program button regardless
+            # of whether settings have been verified.
+            self.programButton.setDisabled(True)
+
+    def onResetUrlClicked(self):
+        self.firmwareUrlLineEdit.setText(DEFAULT_FIRMWARE_URL)
+
+    def onUseUrlClicked(self):
+        """Validate the URL, download the firmware, and update the UI."""
+        url = self.firmwareUrlLineEdit.text().strip()
+
+        # Rewrite GitHub blob URLs to raw URLs transparently, and let the user
+        # know we did it so they can paste the right form next time.
+        normalized, rewritten = normalize_firmware_url(url)
+        if rewritten:
+            self.firmwareUrlLineEdit.setText(normalized)
+            url = normalized
+
+        valid, err = validate_firmware_url(url)
+        if not valid:
+            QtWidgets.QMessageBox.warning(self, "Invalid URL", err)
+            return
+
+        # Disable the button while the download runs so the user can't stack
+        # multiple requests. This is a quick blocking download (same pattern as
+        # the existing startup download) — small firmware file, short timeout.
+        self.useUrlButton.setDisabled(True)
+        self.resetUrlButton.setDisabled(True)
+        self.firmwareUrlLineEdit.setDisabled(True)
+        if rewritten:
+            self.writeText(
+                "Rewrote GitHub 'blob' URL to 'raw' URL.\n"
+                "Downloading firmware from: {u}".format(u=url))
+        else:
+            self.writeText("Downloading firmware from: {u}".format(u=url))
+        QGuiApplication.processEvents()  # let the label repaint before blocking
+
+        try:
+            success, path, error = download_microSWIFT_firmware(url)
+        finally:
+            self.useUrlButton.setEnabled(True)
+            self.resetUrlButton.setEnabled(True)
+            self.firmwareUrlLineEdit.setEnabled(True)
+
+        if success:
+            self.firmware_path = path
+            self.appendText("Firmware downloaded to: {p}".format(p=path))
+            self.updateActiveFirmwareDisplay()
+            # Require re-verification since the firmware changed
+            self.resetVerifyButton()
+        else:
+            self.appendError("Download failed: {e}".format(e=error))
+            QtWidgets.QMessageBox.critical(
+                self, "Download failed",
+                "Could not download firmware:\n\n{e}".format(e=error))
+
     def programDevice(self):
 
         self.find_usb_port()
@@ -1111,9 +1422,21 @@ class ProgrammerApp(QMainWindow):
             self.writeError("STLink programmer not detected.")
             return
 
+        # Double-check we have a firmware file to flash — it could have been
+        # deleted between download and program click.
+        if not self.firmware_path or not os.path.isfile(self.firmware_path):
+            self.writeError("No firmware file is loaded. Download one first.")
+            self.updateActiveFirmwareDisplay()
+            return
+
         self.assembleBinaryConfigFile()
 
-        self.writeText("Running STM32 Programmer CLI, please wait.")
+        # Hand the current firmware path to the worker, then kick off the run
+        self.worker.setFirmwarePath(self.firmware_path)
+
+        self.writeText(
+            "Running STM32 Programmer CLI, please wait.\n"
+            "Flashing firmware: {p}".format(p=self.firmware_path))
 
         self.disableGUI()
         # Run the worker thread so the program will be non-blocking
@@ -1139,6 +1462,10 @@ class ProgrammerApp(QMainWindow):
         self.verifyButton.setDisabled(True)
         self.programButton.setDisabled(True)
         self.downloadConfigFile.setDisabled(True)
+        # Lock URL controls while flashing so the firmware path can't change mid-run
+        self.firmwareUrlLineEdit.setDisabled(True)
+        self.useUrlButton.setDisabled(True)
+        self.resetUrlButton.setDisabled(True)
 
     def reenableGUI(self):
         self.ctEnableButton.setEnabled(True)
@@ -1166,6 +1493,10 @@ class ProgrammerApp(QMainWindow):
         self.verifyButton.setEnabled(True)
         self.programButton.setEnabled(True)
         self.downloadConfigFile.setEnabled(True)
+        # Unlock URL controls after flashing completes
+        self.firmwareUrlLineEdit.setEnabled(True)
+        self.useUrlButton.setEnabled(True)
+        self.resetUrlButton.setEnabled(True)
 
     def displayPicture(self):
 
@@ -1182,6 +1513,7 @@ class ProgrammerApp(QMainWindow):
 
 def main():
     firmware_updated = False
+    firmware_path = ""
 
     parser = argparse.ArgumentParser()
 
@@ -1191,11 +1523,18 @@ def main():
     args = parser.parse_args()
 
     if not args.no_firmware_update:
-        firmware_updated = download_microSWIFT_firmware()
+        firmware_updated, firmware_path, _err = download_microSWIFT_firmware()
+
+    # If the startup download was skipped or failed, fall back to whatever is
+    # already on disk at the default location (if anything).
+    if not firmware_path:
+        candidate = get_firmware_path("microSWIFT_V2.2.elf")
+        if os.path.isfile(candidate):
+            firmware_path = candidate
 
     app = QtWidgets.QApplication(sys.argv)
 
-    programmer = ProgrammerApp(args.no_firmware_update, firmware_updated)
+    programmer = ProgrammerApp(args.no_firmware_update, firmware_updated, firmware_path)
     programmer.show()
     sys.exit(app.exec())
 
