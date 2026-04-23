@@ -1129,6 +1129,8 @@ class ProgrammerApp(QMainWindow):
         settings.setValue("lightGainIndex", self.lightGainComboBox.currentIndex())
         settings.setValue("iridiumTypeIndex", self.iridiumTypeComboBox.currentIndex())
         settings.setValue("gnssSampleRateIndex", self.gnssSampleRateComboBox.currentIndex())
+        # ST-LINK (save serial number, not combo box position)
+        settings.setValue("stlinkSerial", self.stlink_serial)
         # Firmware URL
         settings.setValue("firmwareUrl", self.firmwareUrlLineEdit.text())
 
@@ -1174,6 +1176,13 @@ class ProgrammerApp(QMainWindow):
         self.onLightEnabledClick()
         self.onAccelerometerEnabledClick()
         self.onTurbidityEnabledClick()
+        # ST-LINK — select by serial number if the device is currently connected
+        saved_serial = settings.value("stlinkSerial", "")
+        if saved_serial and self.stlink_devices:
+            for i, dev in enumerate(self.stlink_devices):
+                if dev['serial'] == saved_serial:
+                    self.stlinkComboBox.setCurrentIndex(i)
+                    break
         # Firmware URL
         url = settings.value("firmwareUrl", "")
         if url:
