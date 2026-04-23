@@ -246,10 +246,17 @@ class Worker(QThread):
         super().__init__(parent)
         # Path to the firmware .elf/.bin to flash. Set via setFirmwarePath() before run().
         self.firmware_path = get_firmware_path("microSWIFT_V2.2.elf")
+        # ST-LINK serial number to target. When set, passed as sn=<serial> to
+        # STM32CubeProgrammer so it uses a specific probe.
+        self.stlink_serial = None
 
     def setFirmwarePath(self, path):
         """Set the firmware binary to flash on the next run."""
         self.firmware_path = path
+
+    def setStlinkSerial(self, serial):
+        """Set the ST-LINK serial number to target on the next run."""
+        self.stlink_serial = serial
 
     def run(self):
         firmwareBurnSuccessful = False
@@ -291,10 +298,13 @@ class Worker(QThread):
             self.finished.emit()
             return
 
+        # Build connect arguments, optionally targeting a specific ST-LINK
+        connect_args = ["--connect", "port=SWD"]
+        if self.stlink_serial:
+            connect_args.append("sn={}".format(self.stlink_serial))
+
         # Define the command to run STM32CubeProgrammer
-        command = [
-            programmerPath,
-            "--connect", "port=SWD",  # Specify the port (e.g., USB, JTAG)
+        command = [programmerPath] + connect_args + [
             "--download", firmware_path,  # Firmware file to write to the device
             "--verify",  # Verify after programming
         ]
@@ -333,9 +343,7 @@ class Worker(QThread):
             self.stderrAvailable.emit(f"Unexpected error: {str(e)}")
 
         if firmwareBurnSuccessful:
-            command = [
-                programmerPath,
-                "--connect", "port=SWD",  # Specify the port (e.g., USB, JTAG)
+            command = [programmerPath] + connect_args + [
                 "--download", config_path,  # Firmware file to write to the device
                 "0x083FFC00",  # download address
             ]
@@ -374,9 +382,7 @@ class Worker(QThread):
                 self.stdoutAvailable.emit(f"Unexpected error: {str(e)}")
 
         if configBurnSuccessful:
-            command = [
-                programmerPath,
-                "--connect", "port=SWD",  # Specify the port (e.g., USB, JTAG)
+            command = [programmerPath] + connect_args + [
                 "--download", zeros_path,  # Firmware file to write to the device
                 "0x200C0000",  # download address
             ]
@@ -417,6 +423,7 @@ class Worker(QThread):
 class ProgrammerApp(QMainWindow):
     device_connected = False
     stlink_port = ""
+    stlink_serial = ""
     configFilePath = None
 
     def __init__(self, bypasss_firmware_update, firmware_updated, firmware_path=""):
@@ -427,6 +434,7 @@ class ProgrammerApp(QMainWindow):
         # the initial download at startup or by the user clicking "Download".
         self.firmware_path = firmware_path
         self.configFilePath = get_firmware_path("config.bin")
+        self.stlink_devices = []
         self.setupUi()
 
     def setupUi(self):
@@ -672,36 +680,65 @@ class ProgrammerApp(QMainWindow):
         self.graphicsView = QtWidgets.QGraphicsView(parent=self.centralwidget)
         self.graphicsView.setGeometry(QtCore.QRect(320, 10, 311, 231))
         self.graphicsView.setObjectName("graphicsView")
-        self.statusAndProgFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.statusAndProgFrame.setGeometry(QtCore.QRect(340, 370, 271, 191))
-        self.statusAndProgFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.statusAndProgFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.statusAndProgFrame.setObjectName("statusAndProgFrame")
-        self.layoutWidget3 = QtWidgets.QWidget(parent=self.statusAndProgFrame)
-        self.layoutWidget3.setGeometry(QtCore.QRect(10, 10, 251, 171))
-        self.layoutWidget3.setObjectName("layoutWidget3")
-        self.statusAndProgVertLayout = QtWidgets.QVBoxLayout(self.layoutWidget3)
-        self.statusAndProgVertLayout.setContentsMargins(0, 0, 0, 0)
-        self.statusAndProgVertLayout.setObjectName("statusAndProgVertLayout")
-        self.devicePortLabel = QtWidgets.QLabel(parent=self.layoutWidget3)
-        self.devicePortLabel.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.devicePortLabel.setObjectName("devicePortLabel")
-        self.statusAndProgVertLayout.addWidget(self.devicePortLabel)
-        self.verifyButton = QtWidgets.QPushButton(parent=self.layoutWidget3)
+        # --- ST-LINK device selection frame ---
+        self.stlinkFrame = QtWidgets.QFrame(parent=self.centralwidget)
+        self.stlinkFrame.setGeometry(QtCore.QRect(330, 370, 291, 90))
+        self.stlinkFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
+        self.stlinkFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
+        self.stlinkFrame.setObjectName("stlinkFrame")
+        self.stlinkLayoutWidget = QtWidgets.QWidget(parent=self.stlinkFrame)
+        self.stlinkLayoutWidget.setGeometry(QtCore.QRect(10, 10, 271, 70))
+        self.stlinkLayoutWidget.setObjectName("stlinkLayoutWidget")
+        self.stlinkVertLayout = QtWidgets.QVBoxLayout(self.stlinkLayoutWidget)
+        self.stlinkVertLayout.setContentsMargins(0, 0, 0, 0)
+        self.stlinkVertLayout.setObjectName("stlinkVertLayout")
+        self.stlinkLabelHorizLayout = QtWidgets.QHBoxLayout()
+        self.stlinkLabelHorizLayout.setObjectName("stlinkLabelHorizLayout")
+        self.stlinkLabel = QtWidgets.QLabel(parent=self.stlinkLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.stlinkLabel.setFont(font)
+        self.stlinkLabel.setObjectName("stlinkLabel")
+        self.stlinkLabelHorizLayout.addWidget(self.stlinkLabel)
+        self.stlinkRefreshButton = QtWidgets.QPushButton(parent=self.stlinkLayoutWidget)
+        self.stlinkRefreshButton.setObjectName("stlinkRefreshButton")
+        self.stlinkRefreshButton.setMaximumWidth(70)
+        self.stlinkLabelHorizLayout.addWidget(self.stlinkRefreshButton)
+        self.stlinkVertLayout.addLayout(self.stlinkLabelHorizLayout)
+        self.stlinkComboBox = QtWidgets.QComboBox(parent=self.stlinkLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(11)
+        self.stlinkComboBox.setFont(font)
+        self.stlinkComboBox.setObjectName("stlinkComboBox")
+        self.stlinkVertLayout.addWidget(self.stlinkComboBox)
+
+        # --- Action buttons frame ---
+        self.actionFrame = QtWidgets.QFrame(parent=self.centralwidget)
+        self.actionFrame.setGeometry(QtCore.QRect(330, 470, 291, 120))
+        self.actionFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
+        self.actionFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
+        self.actionFrame.setObjectName("actionFrame")
+        self.actionLayoutWidget = QtWidgets.QWidget(parent=self.actionFrame)
+        self.actionLayoutWidget.setGeometry(QtCore.QRect(10, 10, 271, 100))
+        self.actionLayoutWidget.setObjectName("actionLayoutWidget")
+        self.actionVertLayout = QtWidgets.QVBoxLayout(self.actionLayoutWidget)
+        self.actionVertLayout.setContentsMargins(0, 0, 0, 0)
+        self.actionVertLayout.setObjectName("actionVertLayout")
+        self.verifyButton = QtWidgets.QPushButton(parent=self.actionLayoutWidget)
         font = QtGui.QFont()
         font.setPointSize(12)
         self.verifyButton.setFont(font)
         self.verifyButton.setObjectName("verifyButton")
-        self.statusAndProgVertLayout.addWidget(self.verifyButton)
-        self.programButton = QtWidgets.QPushButton(parent=self.layoutWidget3)
+        self.actionVertLayout.addWidget(self.verifyButton)
+        self.programButton = QtWidgets.QPushButton(parent=self.actionLayoutWidget)
         font = QtGui.QFont()
         font.setPointSize(12)
         self.programButton.setFont(font)
         self.programButton.setObjectName("programButton")
-        self.statusAndProgVertLayout.addWidget(self.programButton)
-        self.downloadConfigFile = QtWidgets.QPushButton(parent=self.layoutWidget3)
+        self.actionVertLayout.addWidget(self.programButton)
+        self.downloadConfigFile = QtWidgets.QPushButton(parent=self.actionLayoutWidget)
         self.downloadConfigFile.setObjectName("downloadConfigFile")
-        self.statusAndProgVertLayout.addWidget(self.downloadConfigFile)
+        self.actionVertLayout.addWidget(self.downloadConfigFile)
         self.accelerometerFrame = QtWidgets.QFrame(parent=self.centralwidget)
         self.accelerometerFrame.setGeometry(QtCore.QRect(10, 240, 301, 51))
         self.accelerometerFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
@@ -851,7 +888,8 @@ class ProgrammerApp(QMainWindow):
         self.dutyCycleLabel.setText(_translate("MainWindow", "Total Duty Cycle (mins)"))
         self.gnssMaxAcqusitionTimeLabel.setText(_translate("MainWindow", "GNSS max time to fix (mins)"))
         self.trackingNumberLabel.setText(_translate("MainWindow", "microSWIFT Tracking number"))
-        self.devicePortLabel.setText(_translate("MainWindow", "No Device Connected"))
+        self.stlinkLabel.setText(_translate("MainWindow", "Available ST-LINKs:"))
+        self.stlinkRefreshButton.setText(_translate("MainWindow", "Refresh"))
         self.verifyButton.setText(_translate("MainWindow", "Verify"))
         self.programButton.setText(_translate("MainWindow", "Program"))
         self.downloadConfigFile.setText(_translate("MainWindow", "Download Config"))
@@ -1110,6 +1148,9 @@ class ProgrammerApp(QMainWindow):
         self.lightMatchGNSSCheckbox.clicked.connect(self.onLightMatchGnssClicked)
         self.turbidityMatchGNSSCheckbox.clicked.connect(self.onTurbidityMatchGnssClicked)
 
+        self.stlinkComboBox.currentIndexChanged.connect(self.onStlinkSelected)
+        self.stlinkRefreshButton.clicked.connect(self.find_usb_port)
+
         self.verifyButton.clicked.connect(self.verifySettings)
         self.programButton.clicked.connect(self.programDevice)
         self.downloadConfigFile.clicked.connect(self.saveConfigAsFile)
@@ -1205,11 +1246,8 @@ class ProgrammerApp(QMainWindow):
         self.resetVerifyButton()
 
     def find_usb_port(self):
-
-        # List all available serial ports
+        """Scan for all ST-LINK devices and populate the dropdown."""
         ports = serial.tools.list_ports.comports()
-
-        stlink_ports = []
 
         # STMicroelectronics VID and known ST-Link PIDs
         STMICRO_VID = 0x0483
@@ -1226,45 +1264,68 @@ class ProgrammerApp(QMainWindow):
             0x3758: "ST-LINK/V3 SET"
         }
 
+        self.stlink_devices = []
+        seen_ports = set()
+
         for port in ports:
-            # Method 1: Check if the port description contains STLINK (works on macOS/Linux)
+            if port.device in seen_ports:
+                continue
+
+            stlink_model = None
+
+            # Check by description (macOS/Linux)
             if "STLINK" in port.description.upper() or "ST-LINK" in port.description.upper():
-                stlink_ports.append(port.device)
-                break
+                stlink_model = "ST-LINK"
 
-        # Method 2: If no STLINK found by description, check by VID/PID (works on Windows)
-        if not stlink_ports:
-            for port in ports:
-                # Check VID/PID attributes (most reliable method)
-                if (hasattr(port, 'vid') and hasattr(port, 'pid') and
+            # Check by VID/PID (works on Windows and as fallback)
+            if (hasattr(port, 'vid') and hasattr(port, 'pid') and
                     port.vid == STMICRO_VID and port.pid in STLINK_PIDS):
-                    stlink_ports.append(port.device)
-                    break
+                stlink_model = STLINK_PIDS[port.pid]
 
-        if stlink_ports:
-            for device in stlink_ports:
-                # Determine which ST-Link model was detected
-                stlink_model = "ST-Link"
-                for port in ports:
-                    if port.device == device:
-                        if hasattr(port, 'pid') and port.pid in STLINK_PIDS:
-                            stlink_model = STLINK_PIDS[port.pid]
-                        break
+            if stlink_model:
+                seen_ports.add(port.device)
+                serial_number = getattr(port, 'serial_number', None) or ""
+                self.stlink_devices.append({
+                    'model': stlink_model,
+                    'port': port.device,
+                    'serial': serial_number,
+                })
 
-                # Keep status color for visibility
-                self.devicePortLabel.setStyleSheet("font-size: 14px; color: green; font-weight: bold;")
-                self.devicePortLabel.setText(f"{stlink_model} found on port {device}")
-                self.device_connected = True
-                self.stlink_port = device
-                break
+        # Populate the combo box (block signals to avoid spurious callbacks)
+        self.stlinkComboBox.blockSignals(True)
+        self.stlinkComboBox.clear()
+
+        if self.stlink_devices:
+            for dev in self.stlink_devices:
+                if dev['serial']:
+                    label = "{port} (SN: {sn}) - {model}".format(
+                        port=dev['port'], sn=dev['serial'], model=dev['model'])
+                else:
+                    label = "{port} - {model}".format(
+                        port=dev['port'], model=dev['model'])
+                self.stlinkComboBox.addItem(label)
+            self.stlinkComboBox.setEnabled(True)
+            self.stlinkComboBox.blockSignals(False)
+            self.onStlinkSelected(0)
         else:
-            # Keep status color for visibility
-            self.devicePortLabel.setStyleSheet("font-size: 14px; color: red; font-weight: bold;")
-            self.devicePortLabel.setText("STLink V3 not found on any USB port.")
+            self.stlinkComboBox.addItem("No ST-LINK devices found")
+            self.stlinkComboBox.setEnabled(False)
+            self.stlinkComboBox.blockSignals(False)
             self.device_connected = False
             self.stlink_port = ""
+            self.stlink_serial = ""
 
-        self.devicePortLabel.setWordWrap(True)
+    def onStlinkSelected(self, index):
+        """Handle ST-LINK device selection from the dropdown."""
+        if not self.stlink_devices or index < 0 or index >= len(self.stlink_devices):
+            self.device_connected = False
+            self.stlink_port = ""
+            self.stlink_serial = ""
+            return
+        dev = self.stlink_devices[index]
+        self.device_connected = True
+        self.stlink_port = dev['port']
+        self.stlink_serial = dev['serial']
 
     def verifySettings(self):
         # For getting GNSS sample rate from drop down box
@@ -1441,11 +1502,28 @@ class ProgrammerApp(QMainWindow):
 
     def programDevice(self):
 
+        # Remember the user's selection before refreshing the device list
+        prev_serial = self.stlink_serial
+
         self.find_usb_port()
+
+        # Restore the previous selection if the device is still present
+        if prev_serial and self.stlink_devices:
+            for i, dev in enumerate(self.stlink_devices):
+                if dev['serial'] == prev_serial:
+                    self.stlinkComboBox.setCurrentIndex(i)
+                    break
 
         if not self.device_connected:
             self.writeError("STLink programmer not detected.")
             return
+
+        # Get the currently selected device
+        idx = self.stlinkComboBox.currentIndex()
+        if idx < 0 or idx >= len(self.stlink_devices):
+            self.writeError("No ST-LINK device selected.")
+            return
+        dev = self.stlink_devices[idx]
 
         # Double-check we have a firmware file to flash — it could have been
         # deleted between download and program click.
@@ -1456,12 +1534,15 @@ class ProgrammerApp(QMainWindow):
 
         self.assembleBinaryConfigFile()
 
-        # Hand the current firmware path to the worker, then kick off the run
+        # Hand the current firmware path and ST-LINK serial to the worker
         self.worker.setFirmwarePath(self.firmware_path)
+        self.worker.setStlinkSerial(dev['serial'])
 
+        selected_label = self.stlinkComboBox.currentText()
         self.writeText(
             "Running STM32 Programmer CLI, please wait.\n"
-            "Flashing firmware: {p}".format(p=self.firmware_path))
+            "Using: {dev}\n"
+            "Flashing firmware: {p}".format(dev=selected_label, p=self.firmware_path))
 
         self.disableGUI()
         # Run the worker thread so the program will be non-blocking
@@ -1485,6 +1566,8 @@ class ProgrammerApp(QMainWindow):
         self.dutyCycleSpinBox.setDisabled(True)
         self.gnssMaxAcquisitionTimeSpinBox.setDisabled(True)
         self.trackingNumberSpinBox.setDisabled(True)
+        self.stlinkComboBox.setDisabled(True)
+        self.stlinkRefreshButton.setDisabled(True)
         self.verifyButton.setDisabled(True)
         self.programButton.setDisabled(True)
         self.downloadConfigFile.setDisabled(True)
@@ -1518,6 +1601,8 @@ class ProgrammerApp(QMainWindow):
         self.dutyCycleSpinBox.setEnabled(True)
         self.gnssMaxAcquisitionTimeSpinBox.setEnabled(True)
         self.trackingNumberSpinBox.setEnabled(True)
+        self.stlinkComboBox.setEnabled(True)
+        self.stlinkRefreshButton.setEnabled(True)
         self.verifyButton.setEnabled(True)
         self.programButton.setEnabled(True)
         self.downloadConfigFile.setEnabled(True)
