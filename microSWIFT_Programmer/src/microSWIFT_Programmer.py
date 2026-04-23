@@ -14,7 +14,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtGui import QTextCharFormat, QColor, QGuiApplication, QFont, QTextCursor
 from PyQt6.QtWidgets import QGraphicsScene, QGraphicsPixmapItem, QTextEdit, QFileDialog, QMainWindow
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import pyqtSignal, QThread, Qt
+from PyQt6.QtCore import pyqtSignal, QThread, Qt, QSettings
 
 from datetime import datetime
 
@@ -950,6 +950,8 @@ class ProgrammerApp(QMainWindow):
 
         self.lightGainComboBox.setCurrentIndex(2)
 
+        self.loadSettings()
+
         self.statusTextEdit.setFont(QFont("Courier New"))
 
         (self.writeText
@@ -1101,6 +1103,81 @@ class ProgrammerApp(QMainWindow):
     def assembleBinaryConfigFile(self):
         with open(self.configFilePath, "wb") as configFile:
             configFile.write(self.assembleBinaryConfigStruct())
+
+    def saveSettings(self):
+        settings = QSettings("SASlabgroup", "microSWIFT_Programmer")
+        # Radio buttons
+        settings.setValue("ctEnabled", self.ctEnableButton.isChecked())
+        settings.setValue("tempEnabled", self.tempEnableButton.isChecked())
+        settings.setValue("lightEnabled", self.lightEnableButton.isChecked())
+        settings.setValue("accelerometerEnabled", self.accelerometerEnableButton.isChecked())
+        settings.setValue("turbidityEnabled", self.turbidityEnableButton.isChecked())
+        # Checkboxes
+        settings.setValue("lightMatchGNSS", self.lightMatchGNSSCheckbox.isChecked())
+        settings.setValue("turbidityMatchGNSS", self.turbidityMatchGNSSCheckbox.isChecked())
+        settings.setValue("gnssHighPerformanceMode", self.gnssHighPerformanceModeCheckBox.isChecked())
+        # Spin boxes
+        settings.setValue("lightNumSamples", self.lightNumSamplesSpinBox.value())
+        settings.setValue("turbiditySerialNumber", self.turbiditySerialNumberSpinBox.value())
+        settings.setValue("turbidityNumSamples", self.turbidityNumSamplesSpinBox.value())
+        settings.setValue("iridiumTxTime", self.iridiumTxTimeSpinBox.value())
+        settings.setValue("gnssNumSamples", self.gnssNumSamplesSpinBox.value())
+        settings.setValue("dutyCycle", self.dutyCycleSpinBox.value())
+        settings.setValue("gnssMaxAcquisitionTime", self.gnssMaxAcquisitionTimeSpinBox.value())
+        settings.setValue("trackingNumber", self.trackingNumberSpinBox.value())
+        # Combo boxes
+        settings.setValue("lightGainIndex", self.lightGainComboBox.currentIndex())
+        settings.setValue("iridiumTypeIndex", self.iridiumTypeComboBox.currentIndex())
+        settings.setValue("gnssSampleRateIndex", self.gnssSampleRateComboBox.currentIndex())
+        # Firmware URL
+        settings.setValue("firmwareUrl", self.firmwareUrlLineEdit.text())
+
+    def loadSettings(self):
+        settings = QSettings("SASlabgroup", "microSWIFT_Programmer")
+        # Only restore if settings have been saved before
+        if not settings.contains("trackingNumber"):
+            return
+        # Spin boxes
+        self.lightNumSamplesSpinBox.setValue(int(settings.value("lightNumSamples", 512)))
+        self.turbiditySerialNumberSpinBox.setValue(int(settings.value("turbiditySerialNumber", 0)))
+        self.turbidityNumSamplesSpinBox.setValue(int(settings.value("turbidityNumSamples", 1024)))
+        self.iridiumTxTimeSpinBox.setValue(int(settings.value("iridiumTxTime", 5)))
+        self.gnssNumSamplesSpinBox.setValue(int(settings.value("gnssNumSamples", 4096)))
+        self.dutyCycleSpinBox.setValue(int(settings.value("dutyCycle", 30)))
+        self.gnssMaxAcquisitionTimeSpinBox.setValue(int(settings.value("gnssMaxAcquisitionTime", 5)))
+        self.trackingNumberSpinBox.setValue(int(settings.value("trackingNumber", 100)))
+        # Combo boxes
+        self.lightGainComboBox.setCurrentIndex(int(settings.value("lightGainIndex", 2)))
+        self.iridiumTypeComboBox.setCurrentIndex(int(settings.value("iridiumTypeIndex", 0)))
+        self.gnssSampleRateComboBox.setCurrentIndex(int(settings.value("gnssSampleRateIndex", 0)))
+        # Checkboxes
+        self.lightMatchGNSSCheckbox.setChecked(settings.value("lightMatchGNSS", False) == True
+                                               or settings.value("lightMatchGNSS", False) == "true")
+        self.turbidityMatchGNSSCheckbox.setChecked(settings.value("turbidityMatchGNSS", False) == True
+                                                   or settings.value("turbidityMatchGNSS", False) == "true")
+        self.gnssHighPerformanceModeCheckBox.setChecked(settings.value("gnssHighPerformanceMode", False) == True
+                                                        or settings.value("gnssHighPerformanceMode", False) == "true")
+        # Radio buttons — set checked state, then trigger handlers to enable/disable dependent widgets
+        self.ctEnableButton.setChecked(settings.value("ctEnabled", False) == True
+                                       or settings.value("ctEnabled", False) == "true")
+        self.tempEnableButton.setChecked(settings.value("tempEnabled", False) == True
+                                         or settings.value("tempEnabled", False) == "true")
+        self.lightEnableButton.setChecked(settings.value("lightEnabled", False) == True
+                                          or settings.value("lightEnabled", False) == "true")
+        self.accelerometerEnableButton.setChecked(settings.value("accelerometerEnabled", False) == True
+                                                  or settings.value("accelerometerEnabled", False) == "true")
+        self.turbidityEnableButton.setChecked(settings.value("turbidityEnabled", False) == True
+                                              or settings.value("turbidityEnabled", False) == "true")
+        # Trigger enable/disable logic for dependent widgets
+        self.onCtEnabledClick()
+        self.onTempEnabledClick()
+        self.onLightEnabledClick()
+        self.onAccelerometerEnabledClick()
+        self.onTurbidityEnabledClick()
+        # Firmware URL
+        url = settings.value("firmwareUrl", "")
+        if url:
+            self.firmwareUrlLineEdit.setText(url)
 
     def fillComboBoxes(self):
         # Iridium type drop box
@@ -1501,6 +1578,7 @@ class ProgrammerApp(QMainWindow):
                 "Could not download firmware:\n\n{e}".format(e=error))
 
     def programDevice(self):
+        self.saveSettings()
 
         # Remember the user's selection before refreshing the device list
         prev_serial = self.stlink_serial
