@@ -30,7 +30,7 @@ def get_resource_path(relative_path):
     else:
         # Development mode - look for resources relative to the src directory
         base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
+
     return os.path.join(base_path, relative_path)
 
 
@@ -307,7 +307,7 @@ class Worker(QThread):
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startupinfo.wShowWindow = subprocess.SW_HIDE
-            
+
             process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo)
 
             # Do other work while the subprocess is running
@@ -348,7 +348,7 @@ class Worker(QThread):
                     startupinfo = subprocess.STARTUPINFO()
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                     startupinfo.wShowWindow = subprocess.SW_HIDE
-                
+
                 process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo)
 
                 # Do other work while the subprocess is running
@@ -389,7 +389,7 @@ class Worker(QThread):
                     startupinfo = subprocess.STARTUPINFO()
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                     startupinfo.wShowWindow = subprocess.SW_HIDE
-                
+
                 process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo)
 
                 # Do other work while the subprocess is running
@@ -989,6 +989,7 @@ class ProgrammerApp(QMainWindow):
                       bool temperature_enabled;
                       bool light_enabled;
                       bool turbidity_enabled;
+                      bool accelerometer_enabled;
 
                       const char compile_date_flash[11];
                       const char compile_time_flash[9];
@@ -1015,7 +1016,7 @@ class ProgrammerApp(QMainWindow):
 
         v3f = self.iridiumTypeComboBox.currentText() == "V3F"
 
-        configStruct = struct.pack("<LLLLLLLLLH??????11s9s",
+        configStruct = struct.pack("<LLLLLLLLLH???????11s9s",
                                    int(self.trackingNumberSpinBox.value()),
                                    int(self.gnssNumSamplesSpinBox.value()),
                                    int(self.dutyCycleSpinBox.value()),
@@ -1032,6 +1033,8 @@ class ProgrammerApp(QMainWindow):
                                    bool(self.tempEnableButton.isChecked()),
                                    bool(self.lightEnableButton.isChecked()),
                                    bool(self.turbidityEnableButton.isChecked()),
+                                   # bool(self.accelerometerEnableButton.isChecked()),
+                                   True,
                                    bytes(date.encode("utf-8")),
                                    bytes(time.encode("utf-8"))
                                    )
@@ -1225,7 +1228,7 @@ class ProgrammerApp(QMainWindow):
                         if hasattr(port, 'pid') and port.pid in STLINK_PIDS:
                             stlink_model = STLINK_PIDS[port.pid]
                         break
-                
+
                 # Keep status color for visibility
                 self.devicePortLabel.setStyleSheet("font-size: 14px; color: green; font-weight: bold;")
                 self.devicePortLabel.setText(f"{stlink_model} found on port {device}")
