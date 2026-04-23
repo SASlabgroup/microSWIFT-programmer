@@ -431,7 +431,7 @@ class ProgrammerApp(QMainWindow):
 
     def setupUi(self):
         self.setObjectName("MainWindow")
-        self.resize(640, 880)
+        self.resize(640, 940)
         self.centralwidget = QtWidgets.QWidget()
         self.centralwidget.setObjectName("centralwidget")
         self.ctFrame = QtWidgets.QFrame(parent=self.centralwidget)
@@ -517,7 +517,7 @@ class ProgrammerApp(QMainWindow):
         self.lightSamplesHorizLayout.addWidget(self.lightNumSamplesSpinBox)
         self.lightVerticalLayout.addLayout(self.lightSamplesHorizLayout)
         self.iridiumFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.iridiumFrame.setGeometry(QtCore.QRect(10, 360, 301, 80))
+        self.iridiumFrame.setGeometry(QtCore.QRect(10, 420, 301, 80))
         self.iridiumFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.iridiumFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.iridiumFrame.setObjectName("iridiumFrame")
@@ -560,7 +560,7 @@ class ProgrammerApp(QMainWindow):
         self.iridiumTypeHorizLayoutr.addWidget(self.iridiumTypeLabel)
         self.iridiumVertLayout.addLayout(self.iridiumTypeHorizLayoutr)
         self.gnssFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.gnssFrame.setGeometry(QtCore.QRect(10, 450, 301, 111))
+        self.gnssFrame.setGeometry(QtCore.QRect(10, 510, 301, 111))
         self.gnssFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.gnssFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.gnssFrame.setObjectName("gnssFrame")
@@ -702,8 +702,26 @@ class ProgrammerApp(QMainWindow):
         self.downloadConfigFile = QtWidgets.QPushButton(parent=self.layoutWidget3)
         self.downloadConfigFile.setObjectName("downloadConfigFile")
         self.statusAndProgVertLayout.addWidget(self.downloadConfigFile)
+        self.accelerometerFrame = QtWidgets.QFrame(parent=self.centralwidget)
+        self.accelerometerFrame.setGeometry(QtCore.QRect(10, 240, 301, 51))
+        self.accelerometerFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
+        self.accelerometerFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
+        self.accelerometerFrame.setObjectName("accelerometerFrame")
+        self.accelerometerLayoutWidget = QtWidgets.QWidget(parent=self.accelerometerFrame)
+        self.accelerometerLayoutWidget.setGeometry(QtCore.QRect(10, 10, 281, 31))
+        self.accelerometerLayoutWidget.setObjectName("accelerometerLayoutWidget")
+        self.accelerometerVertLayout = QtWidgets.QVBoxLayout(self.accelerometerLayoutWidget)
+        self.accelerometerVertLayout.setContentsMargins(0, 0, 0, 0)
+        self.accelerometerVertLayout.setObjectName("accelerometerVertLayout")
+        self.accelerometerEnableButton = QtWidgets.QRadioButton(parent=self.accelerometerLayoutWidget)
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.accelerometerEnableButton.setFont(font)
+        self.accelerometerEnableButton.setAutoExclusive(False)
+        self.accelerometerEnableButton.setObjectName("accelerometerEnableButton")
+        self.accelerometerVertLayout.addWidget(self.accelerometerEnableButton)
         self.turbidityFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.turbidityFrame.setGeometry(QtCore.QRect(10, 240, 301, 111))
+        self.turbidityFrame.setGeometry(QtCore.QRect(10, 300, 301, 111))
         self.turbidityFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.turbidityFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.turbidityFrame.setObjectName("turbidityFrame")
@@ -764,7 +782,7 @@ class ProgrammerApp(QMainWindow):
 
         # --- Firmware URL input panel ---
         self.firmwareUrlFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.firmwareUrlFrame.setGeometry(QtCore.QRect(10, 570, 621, 75))
+        self.firmwareUrlFrame.setGeometry(QtCore.QRect(10, 630, 621, 75))
         self.firmwareUrlFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.firmwareUrlFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.firmwareUrlFrame.setObjectName("firmwareUrlFrame")
@@ -805,7 +823,7 @@ class ProgrammerApp(QMainWindow):
         self.firmwareUrlVertLayout.addWidget(self.activeFirmwareLabel)
 
         self.statusTextEdit = QtWidgets.QTextEdit(parent=self.centralwidget)
-        self.statusTextEdit.setGeometry(QtCore.QRect(10, 650, 621, 221))
+        self.statusTextEdit.setGeometry(QtCore.QRect(10, 710, 621, 221))
         self.statusTextEdit.setObjectName("statusTextEdit")
         self.setCentralWidget(self.centralwidget)
 
@@ -837,6 +855,7 @@ class ProgrammerApp(QMainWindow):
         self.verifyButton.setText(_translate("MainWindow", "Verify"))
         self.programButton.setText(_translate("MainWindow", "Program"))
         self.downloadConfigFile.setText(_translate("MainWindow", "Download Config"))
+        self.accelerometerEnableButton.setText(_translate("MainWindow", "Enable Accelerometer"))
         self.turbidityEnableButton.setText(_translate("MainWindow", "Enable Turbidity"))
         self.turbidityMatchGNSSCheckbox.setText(_translate("MainWindow", "Match GNSS period"))
         self.turbiditySerialNumberLabel.setText(_translate("MainWindow", "Serial Number"))
@@ -1033,8 +1052,7 @@ class ProgrammerApp(QMainWindow):
                                    bool(self.tempEnableButton.isChecked()),
                                    bool(self.lightEnableButton.isChecked()),
                                    bool(self.turbidityEnableButton.isChecked()),
-                                   # bool(self.accelerometerEnableButton.isChecked()),
-                                   True,
+                                   bool(self.accelerometerEnableButton.isChecked()),
                                    bytes(date.encode("utf-8")),
                                    bytes(time.encode("utf-8"))
                                    )
@@ -1087,6 +1105,7 @@ class ProgrammerApp(QMainWindow):
         self.ctEnableButton.clicked.connect(self.onCtEnabledClick)
         self.tempEnableButton.clicked.connect(self.onTempEnabledClick)
         self.lightEnableButton.clicked.connect(self.onLightEnabledClick)
+        self.accelerometerEnableButton.clicked.connect(self.onAccelerometerEnabledClick)
         self.turbidityEnableButton.clicked.connect(self.onTurbidityEnabledClick)
         self.lightMatchGNSSCheckbox.clicked.connect(self.onLightMatchGnssClicked)
         self.turbidityMatchGNSSCheckbox.clicked.connect(self.onTurbidityMatchGnssClicked)
@@ -1155,6 +1174,9 @@ class ProgrammerApp(QMainWindow):
 
         self.resetVerifyButton()
 
+    def onAccelerometerEnabledClick(self):
+        self.resetVerifyButton()
+
     def onTurbidityEnabledClick(self):
         if self.turbidityEnableButton.isChecked():
             self.turbidityNumSamplesLabel.setEnabled(True)
@@ -1188,18 +1210,18 @@ class ProgrammerApp(QMainWindow):
         ports = serial.tools.list_ports.comports()
 
         stlink_ports = []
-        
+
         # STMicroelectronics VID and known ST-Link PIDs
         STMICRO_VID = 0x0483
         STLINK_PIDS = {
             0x3744: "ST-LINK/V1",
-            0x3748: "ST-LINK/V2", 
+            0x3748: "ST-LINK/V2",
             0x374A: "ST-LINK/V2",
             0x374B: "ST-LINK/V2-1",
             0x3752: "ST-LINK/V2-1",
             0x3753: "ST-LINK/V3 (bootloader)",
             0x3754: "ST-LINK/V3",
-            0x3755: "ST-LINK/V3", 
+            0x3755: "ST-LINK/V3",
             0x3757: "ST-LINK/V3 MINIE",
             0x3758: "ST-LINK/V3 SET"
         }
@@ -1209,12 +1231,12 @@ class ProgrammerApp(QMainWindow):
             if "STLINK" in port.description.upper() or "ST-LINK" in port.description.upper():
                 stlink_ports.append(port.device)
                 break
-                
+
         # Method 2: If no STLINK found by description, check by VID/PID (works on Windows)
         if not stlink_ports:
             for port in ports:
                 # Check VID/PID attributes (most reliable method)
-                if (hasattr(port, 'vid') and hasattr(port, 'pid') and 
+                if (hasattr(port, 'vid') and hasattr(port, 'pid') and
                     port.vid == STMICRO_VID and port.pid in STLINK_PIDS):
                     stlink_ports.append(port.device)
                     break
@@ -1451,6 +1473,7 @@ class ProgrammerApp(QMainWindow):
         self.lightEnableButton.setDisabled(True)
         self.lightMatchGNSSCheckbox.setDisabled(True)
         self.lightNumSamplesSpinBox.setDisabled(True)
+        self.accelerometerEnableButton.setDisabled(True)
         self.turbidityEnableButton.setDisabled(True)
         self.turbidityMatchGNSSCheckbox.setDisabled(True)
         self.turbidityNumSamplesSpinBox.setDisabled(True)
@@ -1479,6 +1502,8 @@ class ProgrammerApp(QMainWindow):
         if self.lightEnableButton.isChecked():
             self.lightMatchGNSSCheckbox.setEnabled(True)
             self.lightNumSamplesSpinBox.setEnabled(True)
+
+        self.accelerometerEnableButton.setEnabled(True)
 
         self.turbidityEnableButton.setEnabled(True)
         if self.turbidityEnableButton.isChecked():
