@@ -17,6 +17,7 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import pyqtSignal, QThread, Qt, QSettings
 
 from datetime import datetime
+import glob as glob_module
 
 PROGRAMMER_MAJOR_VERSION = 1
 PROGRAMMER_MINOR_VERSION = 4
@@ -106,6 +107,15 @@ def validate_firmware_url(url):
         return False, "URL does not point to a file."
 
     return True, ""
+
+
+def firmware_needs_config(path):
+    """Return True if the firmware requires configuration flashing.
+
+    Only firmware whose filename starts with 'microSWIFT_V2' needs the
+    config.bin + zeros_64k.bin step.  All other .elf binaries are standalone.
+    """
+    return os.path.basename(path).startswith("microSWIFT_V2")
 
 
 def filename_from_url(url):
@@ -249,6 +259,8 @@ class Worker(QThread):
         # ST-LINK serial number to target. When set, passed as sn=<serial> to
         # STM32CubeProgrammer so it uses a specific probe.
         self.stlink_serial = None
+        # Whether to flash configuration after firmware (only for microSWIFT_V2*)
+        self.flash_config = True
 
     def setFirmwarePath(self, path):
         """Set the firmware binary to flash on the next run."""
@@ -258,164 +270,110 @@ class Worker(QThread):
         """Set the ST-LINK serial number to target on the next run."""
         self.stlink_serial = serial
 
-    def run(self):
-        firmwareBurnSuccessful = False
-        configBurnSuccessful = False
-        systemOS = platform.system()
+    def setFlashConfig(self, enabled):
+        """Set whether configuration should be flashed after firmware."""
+        self.flash_config = enabled
 
-        if systemOS == "Darwin":  # MacOS
-            programmerPath = ("/Applications/STMicroelectronics/STM32Cube/STM32CubeProgrammer/"
-                              "STM32CubeProgrammer.app/Contents/MacOs/bin/STM32_Programmer_CLI")
-        elif systemOS == "Windows":
-            programmerPath = (r"C:\Program Files\STMicroelectronics\STM32Cube\STM32CubeProgrammer\bin"
-                              r"\STM32_Programmer_CLI.exe")
+    def get_programmer_path(self):
+        """Return the platform-specific path to STM32_Programmer_CLI, or None."""
+        system = platform.system()
+        if system == "Darwin":
+            return ("/Applications/STMicroelectronics/STM32Cube/STM32CubeProgrammer/"
+                    "STM32CubeProgrammer.app/Contents/MacOs/bin/STM32_Programmer_CLI")
+        elif system == "Windows":
+            return (r"C:\Program Files\STMicroelectronics\STM32Cube\STM32CubeProgrammer\bin"
+                    r"\STM32_Programmer_CLI.exe")
         else:  # Linux
-            # Common Linux installation paths
-            potential_paths = [
+            for path in [
                 "/usr/local/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin/STM32_Programmer_CLI",
                 "/opt/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin/STM32_Programmer_CLI",
-                os.path.expanduser("~/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin/STM32_Programmer_CLI")
-            ]
-            programmerPath = None
-            for path in potential_paths:
+                os.path.expanduser("~/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin/STM32_Programmer_CLI"),
+            ]:
                 if os.path.exists(path):
-                    programmerPath = path
-                    break
-            if not programmerPath:
-                self.stderrAvailable.emit("Error: STM32CubeProgrammer not found on Linux")
-                self.finished.emit()
-                return
+                    return path
+            return None
 
-        # Get firmware paths
-        firmware_path = self.firmware_path
-        config_path = get_firmware_path("config.bin")
-        zeros_path = get_firmware_path("zeros_64k.bin")
+    def _run_programmer(self, command):
+        """Run an STM32CubeProgrammer command, emitting output via signals.
 
-        # Bail out early if the firmware file isn't actually on disk
-        if not firmware_path or not os.path.isfile(firmware_path):
-            self.stderrAvailable.emit(
-                "Error: firmware file not found: {p}".format(p=firmware_path))
-            self.finished.emit()
-            return
-
-        # Build connect arguments, optionally targeting a specific ST-LINK
-        connect_args = ["--connect", "port=SWD"]
-        if self.stlink_serial:
-            connect_args.append("sn={}".format(self.stlink_serial))
-
-        # Define the command to run STM32CubeProgrammer
-        command = [programmerPath] + connect_args + [
-            "--download", firmware_path,  # Firmware file to write to the device
-            "--verify",  # Verify after programming
-        ]
-
-        # Burn the firmware first
+        Returns True if the process exited successfully, False otherwise.
+        """
         try:
-            # On Windows, hide console windows from subprocess calls
             startupinfo = None
             if platform.system() == "Windows":
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startupinfo.wShowWindow = subprocess.SW_HIDE
 
-            process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo)
+            process = subprocess.Popen(
+                command, text=True,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                startupinfo=startupinfo)
 
-            # Do other work while the subprocess is running
             while process.poll() is None:
-                # Retrieve output (if needed)
                 stdout, stderr = process.communicate()
-
                 if stdout:
                     cleanedText = re.sub(r'\x1b\[[0-9;]*[mG]', '', stdout)
                     self.stdoutAvailable.emit(cleanedText)
 
-            if process.returncode == 0:
-                firmwareBurnSuccessful = True
-            else:
-                self.stderrAvailable.emit(f"\nProgramming Failed with code {process.returncode}")
-
+            if process.returncode != 0:
+                self.stderrAvailable.emit(
+                    "\nProgramming Failed with code {}".format(process.returncode))
+                return False
+            return True
 
         except subprocess.CalledProcessError as e:
-            # If there's an error, show the error message
-            self.stderrAvailable.emit(f"/nError: {e.stderr}")
+            self.stderrAvailable.emit("/nError: {}".format(e.stderr))
             self.stderrAvailable.emit(e.stdout)
         except Exception as e:
-            self.stderrAvailable.emit(f"Unexpected error: {str(e)}")
+            self.stderrAvailable.emit("Unexpected error: {}".format(e))
+        return False
 
-        if firmwareBurnSuccessful:
-            command = [programmerPath] + connect_args + [
-                "--download", config_path,  # Firmware file to write to the device
-                "0x083FFC00",  # download address
-            ]
+    def flash_firmware(self, programmer_path, connect_args):
+        """Flash the firmware .elf to the device. Returns True on success."""
+        firmware_path = self.firmware_path
+        if not firmware_path or not os.path.isfile(firmware_path):
+            self.stderrAvailable.emit(
+                "Error: firmware file not found: {p}".format(p=firmware_path))
+            return False
 
-            # Burn the configuration bytes
-            try:
-                # On Windows, hide console windows from subprocess calls
-                startupinfo = None
-                if platform.system() == "Windows":
-                    startupinfo = subprocess.STARTUPINFO()
-                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                    startupinfo.wShowWindow = subprocess.SW_HIDE
+        command = [programmer_path] + connect_args + [
+            "--download", firmware_path,
+            "--verify",
+        ]
+        return self._run_programmer(command)
 
-                process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo)
+    def flash_configuration(self, programmer_path, connect_args):
+        """Write config.bin and zeros_64k.bin to device memory. Returns True on success."""
+        config_path = get_firmware_path("config.bin")
+        command = [programmer_path] + connect_args + [
+            "--download", config_path,
+            "0x083FFC00",
+        ]
+        if not self._run_programmer(command):
+            return False
 
-                # Do other work while the subprocess is running
-                while process.poll() is None:
-                    # Retrieve output (if needed)
-                    stdout, stderr = process.communicate()
+        zeros_path = get_firmware_path("zeros_64k.bin")
+        command = [programmer_path] + connect_args + [
+            "--download", zeros_path,
+            "0x200C0000",
+        ]
+        return self._run_programmer(command)
 
-                    if stdout:
-                        cleanedText = re.sub(r'\x1b\[[0-9;]*[mG]', '', stdout)
-                        self.stdoutAvailable.emit(cleanedText)
+    def run(self):
+        programmer_path = self.get_programmer_path()
+        if not programmer_path:
+            self.stderrAvailable.emit("Error: STM32CubeProgrammer not found")
+            self.finished.emit()
+            return
 
-                if process.returncode != 0:
-                    self.stderrAvailable.emit(f"\nProgramming Failed with code {process.returncode}")
+        connect_args = ["--connect", "port=SWD"]
+        if self.stlink_serial:
+            connect_args.append("sn={}".format(self.stlink_serial))
 
-                else:
-                    configBurnSuccessful = True;
-
-            except subprocess.CalledProcessError as e:
-                # If there's an error, show the error message
-                self.stderrAvailable.emit(f"/nError: {e.stderr}")
-                self.stderrAvailable.emit(e.stdout)
-            except Exception as e:
-                self.stdoutAvailable.emit(f"Unexpected error: {str(e)}")
-
-        if configBurnSuccessful:
-            command = [programmerPath] + connect_args + [
-                "--download", zeros_path,  # Firmware file to write to the device
-                "0x200C0000",  # download address
-            ]
-
-            # Burn the configuration bytes
-            try:
-                # On Windows, hide console windows from subprocess calls
-                startupinfo = None
-                if platform.system() == "Windows":
-                    startupinfo = subprocess.STARTUPINFO()
-                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                    startupinfo.wShowWindow = subprocess.SW_HIDE
-
-                process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, startupinfo=startupinfo)
-
-                # Do other work while the subprocess is running
-                while process.poll() is None:
-                    # Retrieve output (if needed)
-                    stdout, stderr = process.communicate()
-
-                    if stdout:
-                        cleanedText = re.sub(r'\x1b\[[0-9;]*[mG]', '', stdout)
-                        self.stdoutAvailable.emit(cleanedText)
-
-                if process.returncode != 0:
-                    self.stderrAvailable.emit(f"\nProgramming Failed with code {process.returncode}")
-
-            except subprocess.CalledProcessError as e:
-                # If there's an error, show the error message
-                self.stderrAvailable.emit(f"/nError: {e.stderr}")
-                self.stderrAvailable.emit(e.stdout)
-            except Exception as e:
-                self.stderrAvailable.emit(f"Unexpected error: {str(e)}")
+        if self.flash_firmware(programmer_path, connect_args):
+            if self.flash_config:
+                self.flash_configuration(programmer_path, connect_args)
 
         self.finished.emit()
 
@@ -435,362 +393,147 @@ class ProgrammerApp(QMainWindow):
         self.firmware_path = firmware_path
         self.configFilePath = get_firmware_path("config.bin")
         self.stlink_devices = []
+        self.firmware_files = []
+        self._config_needed = True
         self.setupUi()
 
     def setupUi(self):
         self.setObjectName("MainWindow")
-        self.resize(640, 940)
+        self.resize(640, 900)
         self.centralwidget = QtWidgets.QWidget()
         self.centralwidget.setObjectName("centralwidget")
-        self.ctFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.ctFrame.setGeometry(QtCore.QRect(10, 10, 301, 81))
-        self.ctFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.ctFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
+
+        # ---- Top-level layout ----
+        mainLayout = QtWidgets.QVBoxLayout(self.centralwidget)
+        mainLayout.setContentsMargins(10, 10, 10, 10)
+        mainLayout.setSpacing(8)
+
+        columnsLayout = QtWidgets.QHBoxLayout()
+        columnsLayout.setSpacing(10)
+        leftColumn = QtWidgets.QVBoxLayout()
+        leftColumn.setSpacing(8)
+        rightColumn = QtWidgets.QVBoxLayout()
+        rightColumn.setSpacing(8)
+        columnsLayout.addLayout(leftColumn, stretch=1)
+        columnsLayout.addLayout(rightColumn, stretch=1)
+        mainLayout.addLayout(columnsLayout)
+
+        # ---- Helper for frame styling ----
+        def styled_frame():
+            frame = QtWidgets.QFrame(parent=self.centralwidget)
+            frame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
+            frame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
+            frame.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred,
+                                QtWidgets.QSizePolicy.Policy.Fixed)
+            return frame
+
+        font12 = QtGui.QFont()
+        font12.setPointSize(12)
+        font11 = QtGui.QFont()
+        font11.setPointSize(11)
+
+        # ---- CT frame (left column) ----
+        self.ctFrame = styled_frame()
         self.ctFrame.setObjectName("ctFrame")
-        self.layoutWidget = QtWidgets.QWidget(parent=self.ctFrame)
-        self.layoutWidget.setGeometry(QtCore.QRect(10, 10, 281, 61))
-        self.layoutWidget.setObjectName("layoutWidget")
-        self.ctVertLayout = QtWidgets.QVBoxLayout(self.layoutWidget)
-        self.ctVertLayout.setContentsMargins(0, 0, 0, 0)
+        self.ctVertLayout = QtWidgets.QVBoxLayout(self.ctFrame)
+        self.ctVertLayout.setContentsMargins(10, 10, 10, 10)
         self.ctVertLayout.setObjectName("ctVertLayout")
-        self.ctEnableButton = QtWidgets.QRadioButton(parent=self.layoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.ctEnableButton.setFont(font)
+        self.ctEnableButton = QtWidgets.QRadioButton(parent=self.ctFrame)
+        self.ctEnableButton.setFont(font12)
         self.ctEnableButton.setAutoExclusive(False)
         self.ctEnableButton.setObjectName("ctEnableButton")
         self.ctVertLayout.addWidget(self.ctEnableButton)
-        self.tempEnableButton = QtWidgets.QRadioButton(parent=self.layoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.tempEnableButton.setFont(font)
+        self.tempEnableButton = QtWidgets.QRadioButton(parent=self.ctFrame)
+        self.tempEnableButton.setFont(font12)
         self.tempEnableButton.setAutoExclusive(False)
         self.tempEnableButton.setObjectName("tempEnableButton")
         self.ctVertLayout.addWidget(self.tempEnableButton)
-        self.lightFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.lightFrame.setGeometry(QtCore.QRect(10, 100, 301, 131))
-        self.lightFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.lightFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
+        leftColumn.addWidget(self.ctFrame)
+
+        # ---- Light frame (left column) ----
+        self.lightFrame = styled_frame()
         self.lightFrame.setObjectName("lightFrame")
-        self.layoutWidget1 = QtWidgets.QWidget(parent=self.lightFrame)
-        self.layoutWidget1.setGeometry(QtCore.QRect(10, 11, 286, 115))
-        self.layoutWidget1.setObjectName("layoutWidget1")
-        self.lightVerticalLayout = QtWidgets.QVBoxLayout(self.layoutWidget1)
-        self.lightVerticalLayout.setContentsMargins(0, 0, 0, 0)
+        self.lightVerticalLayout = QtWidgets.QVBoxLayout(self.lightFrame)
+        self.lightVerticalLayout.setContentsMargins(10, 10, 10, 6)
         self.lightVerticalLayout.setObjectName("lightVerticalLayout")
         self.lightEnableHorizLayout = QtWidgets.QHBoxLayout()
         self.lightEnableHorizLayout.setObjectName("lightEnableHorizLayout")
-        self.lightEnableButton = QtWidgets.QRadioButton(parent=self.layoutWidget1)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.lightEnableButton.setFont(font)
+        self.lightEnableButton = QtWidgets.QRadioButton(parent=self.lightFrame)
+        self.lightEnableButton.setFont(font12)
         self.lightEnableButton.setObjectName("lightEnableButton")
         self.lightEnableHorizLayout.addWidget(self.lightEnableButton)
-        self.lightMatchGNSSCheckbox = QtWidgets.QCheckBox(parent=self.layoutWidget1)
+        self.lightMatchGNSSCheckbox = QtWidgets.QCheckBox(parent=self.lightFrame)
         self.lightMatchGNSSCheckbox.setEnabled(False)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.lightMatchGNSSCheckbox.setFont(font)
+        self.lightMatchGNSSCheckbox.setFont(font12)
         self.lightMatchGNSSCheckbox.setObjectName("lightMatchGNSSCheckbox")
         self.lightEnableHorizLayout.addWidget(self.lightMatchGNSSCheckbox)
         self.lightVerticalLayout.addLayout(self.lightEnableHorizLayout)
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
-        self.lightGainLabel = QtWidgets.QLabel(parent=self.layoutWidget1)
+        self.lightGainLabel = QtWidgets.QLabel(parent=self.lightFrame)
         self.lightGainLabel.setEnabled(False)
         self.lightGainLabel.setObjectName("lightGainLabel")
         self.horizontalLayout.addWidget(self.lightGainLabel)
-        self.lightGainComboBox = QtWidgets.QComboBox(parent=self.layoutWidget1)
+        self.lightGainComboBox = QtWidgets.QComboBox(parent=self.lightFrame)
         self.lightGainComboBox.setEnabled(False)
         self.lightGainComboBox.setObjectName("lightGainComboBox")
         self.horizontalLayout.addWidget(self.lightGainComboBox)
         self.lightVerticalLayout.addLayout(self.horizontalLayout)
         self.lightSamplesHorizLayout = QtWidgets.QHBoxLayout()
         self.lightSamplesHorizLayout.setObjectName("lightSamplesHorizLayout")
-        self.lightNumSamplesLabel = QtWidgets.QLabel(parent=self.layoutWidget1)
+        self.lightNumSamplesLabel = QtWidgets.QLabel(parent=self.lightFrame)
         self.lightNumSamplesLabel.setEnabled(False)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.lightNumSamplesLabel.setFont(font)
+        self.lightNumSamplesLabel.setFont(font12)
         self.lightNumSamplesLabel.setObjectName("lightNumSamplesLabel")
         self.lightSamplesHorizLayout.addWidget(self.lightNumSamplesLabel)
-        self.lightNumSamplesSpinBox = QtWidgets.QSpinBox(parent=self.layoutWidget1)
+        self.lightNumSamplesSpinBox = QtWidgets.QSpinBox(parent=self.lightFrame)
         self.lightNumSamplesSpinBox.setEnabled(False)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.lightNumSamplesSpinBox.setFont(font)
+        self.lightNumSamplesSpinBox.setFont(font12)
         self.lightNumSamplesSpinBox.setMaximum(1800)
         self.lightNumSamplesSpinBox.setProperty("value", 512)
         self.lightNumSamplesSpinBox.setObjectName("lightNumSamplesSpinBox")
         self.lightSamplesHorizLayout.addWidget(self.lightNumSamplesSpinBox)
         self.lightVerticalLayout.addLayout(self.lightSamplesHorizLayout)
-        self.iridiumFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.iridiumFrame.setGeometry(QtCore.QRect(10, 420, 301, 80))
-        self.iridiumFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.iridiumFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.iridiumFrame.setObjectName("iridiumFrame")
-        self.layoutWidget2 = QtWidgets.QWidget(parent=self.iridiumFrame)
-        self.layoutWidget2.setGeometry(QtCore.QRect(10, 10, 281, 67))
-        self.layoutWidget2.setObjectName("layoutWidget2")
-        self.iridiumVertLayout = QtWidgets.QVBoxLayout(self.layoutWidget2)
-        self.iridiumVertLayout.setContentsMargins(0, 0, 0, 0)
-        self.iridiumVertLayout.setObjectName("iridiumVertLayout")
-        self.iridiumTxTimeHorizLayout = QtWidgets.QHBoxLayout()
-        self.iridiumTxTimeHorizLayout.setObjectName("iridiumTxTimeHorizLayout")
-        self.iridiumTxTimeLabel = QtWidgets.QLabel(parent=self.layoutWidget2)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.iridiumTxTimeLabel.setFont(font)
-        self.iridiumTxTimeLabel.setObjectName("iridiumTxTimeLabel")
-        self.iridiumTxTimeHorizLayout.addWidget(self.iridiumTxTimeLabel)
-        self.iridiumTxTimeSpinBox = QtWidgets.QSpinBox(parent=self.layoutWidget2)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.iridiumTxTimeSpinBox.setFont(font)
-        self.iridiumTxTimeSpinBox.setMaximum(60)
-        self.iridiumTxTimeSpinBox.setProperty("value", 5)
-        self.iridiumTxTimeSpinBox.setObjectName("iridiumTxTimeSpinBox")
-        self.iridiumTxTimeHorizLayout.addWidget(self.iridiumTxTimeSpinBox)
-        self.iridiumVertLayout.addLayout(self.iridiumTxTimeHorizLayout)
-        self.iridiumTypeHorizLayoutr = QtWidgets.QHBoxLayout()
-        self.iridiumTypeHorizLayoutr.setObjectName("iridiumTypeHorizLayoutr")
-        self.iridiumTypeComboBox = QtWidgets.QComboBox(parent=self.layoutWidget2)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.iridiumTypeComboBox.setFont(font)
-        self.iridiumTypeComboBox.setObjectName("iridiumTypeComboBox")
-        self.iridiumTypeHorizLayoutr.addWidget(self.iridiumTypeComboBox)
-        self.iridiumTypeLabel = QtWidgets.QLabel(parent=self.layoutWidget2)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.iridiumTypeLabel.setFont(font)
-        self.iridiumTypeLabel.setObjectName("iridiumTypeLabel")
-        self.iridiumTypeHorizLayoutr.addWidget(self.iridiumTypeLabel)
-        self.iridiumVertLayout.addLayout(self.iridiumTypeHorizLayoutr)
-        self.gnssFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.gnssFrame.setGeometry(QtCore.QRect(10, 510, 301, 111))
-        self.gnssFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.gnssFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.gnssFrame.setObjectName("gnssFrame")
-        self.layoutWidget_11 = QtWidgets.QWidget(parent=self.gnssFrame)
-        self.layoutWidget_11.setGeometry(QtCore.QRect(10, 10, 281, 90))
-        self.layoutWidget_11.setObjectName("layoutWidget_11")
-        self.gnssVertLayout = QtWidgets.QVBoxLayout(self.layoutWidget_11)
-        self.gnssVertLayout.setContentsMargins(0, 0, 0, 0)
-        self.gnssVertLayout.setObjectName("gnssVertLayout")
-        self.gnssSamplesHorizLayout = QtWidgets.QHBoxLayout()
-        self.gnssSamplesHorizLayout.setObjectName("gnssSamplesHorizLayout")
-        self.gnssNumSamplesLabel = QtWidgets.QLabel(parent=self.layoutWidget_11)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.gnssNumSamplesLabel.setFont(font)
-        self.gnssNumSamplesLabel.setObjectName("gnssNumSamplesLabel")
-        self.gnssSamplesHorizLayout.addWidget(self.gnssNumSamplesLabel)
-        self.gnssNumSamplesSpinBox = QtWidgets.QSpinBox(parent=self.layoutWidget_11)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.gnssNumSamplesSpinBox.setFont(font)
-        self.gnssNumSamplesSpinBox.setMaximum(32768)
-        self.gnssNumSamplesSpinBox.setProperty("value", 4096)
-        self.gnssNumSamplesSpinBox.setObjectName("gnssNumSamplesSpinBox")
-        self.gnssSamplesHorizLayout.addWidget(self.gnssNumSamplesSpinBox)
-        self.gnssVertLayout.addLayout(self.gnssSamplesHorizLayout)
-        self.gnssHighPerformanceModeCheckBox = QtWidgets.QCheckBox(parent=self.layoutWidget_11)
-        self.gnssHighPerformanceModeCheckBox.setObjectName("gnssHighPerformanceModeCheckBox")
-        self.gnssVertLayout.addWidget(self.gnssHighPerformanceModeCheckBox)
-        self.gnssSampleRateHorizLayout = QtWidgets.QHBoxLayout()
-        self.gnssSampleRateHorizLayout.setObjectName("gnssSampleRateHorizLayout")
-        self.gnssSampleRateComboBox = QtWidgets.QComboBox(parent=self.layoutWidget_11)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.gnssSampleRateComboBox.setFont(font)
-        self.gnssSampleRateComboBox.setObjectName("gnssSampleRateComboBox")
-        self.gnssSampleRateHorizLayout.addWidget(self.gnssSampleRateComboBox)
-        self.gnssSampleRateLabel = QtWidgets.QLabel(parent=self.layoutWidget_11)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.gnssSampleRateLabel.setFont(font)
-        self.gnssSampleRateLabel.setObjectName("gnssSampleRateLabel")
-        self.gnssSampleRateHorizLayout.addWidget(self.gnssSampleRateLabel)
-        self.gnssVertLayout.addLayout(self.gnssSampleRateHorizLayout)
-        self.timingFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.timingFrame.setGeometry(QtCore.QRect(330, 250, 291, 111))
-        self.timingFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.timingFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.timingFrame.setObjectName("timingFrame")
-        self.verticalLayoutWidget = QtWidgets.QWidget(parent=self.timingFrame)
-        self.verticalLayoutWidget.setGeometry(QtCore.QRect(10, 10, 271, 91))
-        self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
-        self.timingVertLayout = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
-        self.timingVertLayout.setContentsMargins(0, 0, 0, 0)
-        self.timingVertLayout.setObjectName("timingVertLayout")
-        self.dutyCycleHorizLayout = QtWidgets.QHBoxLayout()
-        self.dutyCycleHorizLayout.setObjectName("dutyCycleHorizLayout")
-        self.dutyCycleLabel = QtWidgets.QLabel(parent=self.verticalLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.dutyCycleLabel.setFont(font)
-        self.dutyCycleLabel.setObjectName("dutyCycleLabel")
-        self.dutyCycleHorizLayout.addWidget(self.dutyCycleLabel)
-        self.dutyCycleSpinBox = QtWidgets.QSpinBox(parent=self.verticalLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.dutyCycleSpinBox.setFont(font)
-        self.dutyCycleSpinBox.setMaximum(1440)
-        self.dutyCycleSpinBox.setProperty("value", 30)
-        self.dutyCycleSpinBox.setObjectName("dutyCycleSpinBox")
-        self.dutyCycleHorizLayout.addWidget(self.dutyCycleSpinBox)
-        self.timingVertLayout.addLayout(self.dutyCycleHorizLayout)
-        self.gnssBufferTimeHorizLayout = QtWidgets.QHBoxLayout()
-        self.gnssBufferTimeHorizLayout.setObjectName("gnssBufferTimeHorizLayout")
-        self.gnssMaxAcqusitionTimeLabel = QtWidgets.QLabel(parent=self.verticalLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.gnssMaxAcqusitionTimeLabel.setFont(font)
-        self.gnssMaxAcqusitionTimeLabel.setWhatsThis("")
-        self.gnssMaxAcqusitionTimeLabel.setObjectName("gnssMaxAcqusitionTimeLabel")
-        self.gnssBufferTimeHorizLayout.addWidget(self.gnssMaxAcqusitionTimeLabel)
-        self.gnssMaxAcquisitionTimeSpinBox = QtWidgets.QSpinBox(parent=self.verticalLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.gnssMaxAcquisitionTimeSpinBox.setFont(font)
-        self.gnssMaxAcquisitionTimeSpinBox.setWhatsThis("")
-        self.gnssMaxAcquisitionTimeSpinBox.setMaximum(10)
-        self.gnssMaxAcquisitionTimeSpinBox.setProperty("value", 5)
-        self.gnssMaxAcquisitionTimeSpinBox.setObjectName("gnssMaxAcquisitionTimeSpinBox")
-        self.gnssBufferTimeHorizLayout.addWidget(self.gnssMaxAcquisitionTimeSpinBox)
-        self.timingVertLayout.addLayout(self.gnssBufferTimeHorizLayout)
-        self.trackingNumberHorizLayourt = QtWidgets.QHBoxLayout()
-        self.trackingNumberHorizLayourt.setObjectName("trackingNumberHorizLayourt")
-        self.trackingNumberLabel = QtWidgets.QLabel(parent=self.verticalLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.trackingNumberLabel.setFont(font)
-        self.trackingNumberLabel.setObjectName("trackingNumberLabel")
-        self.trackingNumberHorizLayourt.addWidget(self.trackingNumberLabel)
-        self.trackingNumberSpinBox = QtWidgets.QSpinBox(parent=self.verticalLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.trackingNumberSpinBox.setFont(font)
-        self.trackingNumberSpinBox.setMaximum(1000)
-        self.trackingNumberSpinBox.setProperty("value", 100)
-        self.trackingNumberSpinBox.setObjectName("trackingNumberSpinBox")
-        self.trackingNumberHorizLayourt.addWidget(self.trackingNumberSpinBox)
-        self.timingVertLayout.addLayout(self.trackingNumberHorizLayourt)
-        self.graphicsView = QtWidgets.QGraphicsView(parent=self.centralwidget)
-        self.graphicsView.setGeometry(QtCore.QRect(320, 10, 311, 231))
-        self.graphicsView.setObjectName("graphicsView")
-        # --- ST-LINK device selection frame ---
-        self.stlinkFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.stlinkFrame.setGeometry(QtCore.QRect(330, 370, 291, 90))
-        self.stlinkFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.stlinkFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.stlinkFrame.setObjectName("stlinkFrame")
-        self.stlinkLayoutWidget = QtWidgets.QWidget(parent=self.stlinkFrame)
-        self.stlinkLayoutWidget.setGeometry(QtCore.QRect(10, 10, 271, 70))
-        self.stlinkLayoutWidget.setObjectName("stlinkLayoutWidget")
-        self.stlinkVertLayout = QtWidgets.QVBoxLayout(self.stlinkLayoutWidget)
-        self.stlinkVertLayout.setContentsMargins(0, 0, 0, 0)
-        self.stlinkVertLayout.setObjectName("stlinkVertLayout")
-        self.stlinkLabelHorizLayout = QtWidgets.QHBoxLayout()
-        self.stlinkLabelHorizLayout.setObjectName("stlinkLabelHorizLayout")
-        self.stlinkLabel = QtWidgets.QLabel(parent=self.stlinkLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.stlinkLabel.setFont(font)
-        self.stlinkLabel.setObjectName("stlinkLabel")
-        self.stlinkLabelHorizLayout.addWidget(self.stlinkLabel)
-        self.stlinkRefreshButton = QtWidgets.QPushButton(parent=self.stlinkLayoutWidget)
-        self.stlinkRefreshButton.setObjectName("stlinkRefreshButton")
-        self.stlinkRefreshButton.setMaximumWidth(70)
-        self.stlinkLabelHorizLayout.addWidget(self.stlinkRefreshButton)
-        self.stlinkVertLayout.addLayout(self.stlinkLabelHorizLayout)
-        self.stlinkComboBox = QtWidgets.QComboBox(parent=self.stlinkLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(11)
-        self.stlinkComboBox.setFont(font)
-        self.stlinkComboBox.setObjectName("stlinkComboBox")
-        self.stlinkVertLayout.addWidget(self.stlinkComboBox)
+        leftColumn.addWidget(self.lightFrame)
 
-        # --- Action buttons frame ---
-        self.actionFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.actionFrame.setGeometry(QtCore.QRect(330, 470, 291, 120))
-        self.actionFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.actionFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.actionFrame.setObjectName("actionFrame")
-        self.actionLayoutWidget = QtWidgets.QWidget(parent=self.actionFrame)
-        self.actionLayoutWidget.setGeometry(QtCore.QRect(10, 10, 271, 100))
-        self.actionLayoutWidget.setObjectName("actionLayoutWidget")
-        self.actionVertLayout = QtWidgets.QVBoxLayout(self.actionLayoutWidget)
-        self.actionVertLayout.setContentsMargins(0, 0, 0, 0)
-        self.actionVertLayout.setObjectName("actionVertLayout")
-        self.verifyButton = QtWidgets.QPushButton(parent=self.actionLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.verifyButton.setFont(font)
-        self.verifyButton.setObjectName("verifyButton")
-        self.actionVertLayout.addWidget(self.verifyButton)
-        self.programButton = QtWidgets.QPushButton(parent=self.actionLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.programButton.setFont(font)
-        self.programButton.setObjectName("programButton")
-        self.actionVertLayout.addWidget(self.programButton)
-        self.downloadConfigFile = QtWidgets.QPushButton(parent=self.actionLayoutWidget)
-        self.downloadConfigFile.setObjectName("downloadConfigFile")
-        self.actionVertLayout.addWidget(self.downloadConfigFile)
-        self.accelerometerFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.accelerometerFrame.setGeometry(QtCore.QRect(10, 240, 301, 51))
-        self.accelerometerFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.accelerometerFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
+        # ---- Accelerometer frame (left column) ----
+        self.accelerometerFrame = styled_frame()
         self.accelerometerFrame.setObjectName("accelerometerFrame")
-        self.accelerometerLayoutWidget = QtWidgets.QWidget(parent=self.accelerometerFrame)
-        self.accelerometerLayoutWidget.setGeometry(QtCore.QRect(10, 10, 281, 31))
-        self.accelerometerLayoutWidget.setObjectName("accelerometerLayoutWidget")
-        self.accelerometerVertLayout = QtWidgets.QVBoxLayout(self.accelerometerLayoutWidget)
-        self.accelerometerVertLayout.setContentsMargins(0, 0, 0, 0)
+        self.accelerometerVertLayout = QtWidgets.QVBoxLayout(self.accelerometerFrame)
+        self.accelerometerVertLayout.setContentsMargins(10, 10, 10, 10)
         self.accelerometerVertLayout.setObjectName("accelerometerVertLayout")
-        self.accelerometerEnableButton = QtWidgets.QRadioButton(parent=self.accelerometerLayoutWidget)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.accelerometerEnableButton.setFont(font)
+        self.accelerometerEnableButton = QtWidgets.QRadioButton(parent=self.accelerometerFrame)
+        self.accelerometerEnableButton.setFont(font12)
         self.accelerometerEnableButton.setAutoExclusive(False)
         self.accelerometerEnableButton.setObjectName("accelerometerEnableButton")
         self.accelerometerVertLayout.addWidget(self.accelerometerEnableButton)
-        self.turbidityFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.turbidityFrame.setGeometry(QtCore.QRect(10, 300, 301, 111))
-        self.turbidityFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.turbidityFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
+        leftColumn.addWidget(self.accelerometerFrame)
+
+        # ---- Turbidity frame (left column) ----
+        self.turbidityFrame = styled_frame()
         self.turbidityFrame.setObjectName("turbidityFrame")
-        self.layoutWidget_2 = QtWidgets.QWidget(parent=self.turbidityFrame)
-        self.layoutWidget_2.setGeometry(QtCore.QRect(10, 11, 281, 94))
-        self.layoutWidget_2.setObjectName("layoutWidget_2")
-        self.turbidityVerticalLayout = QtWidgets.QVBoxLayout(self.layoutWidget_2)
-        self.turbidityVerticalLayout.setContentsMargins(0, 0, 0, 0)
+        self.turbidityVerticalLayout = QtWidgets.QVBoxLayout(self.turbidityFrame)
+        self.turbidityVerticalLayout.setContentsMargins(10, 10, 10, 6)
         self.turbidityVerticalLayout.setObjectName("turbidityVerticalLayout")
         self.turbidityEnableHorizLayout = QtWidgets.QHBoxLayout()
         self.turbidityEnableHorizLayout.setObjectName("turbidityEnableHorizLayout")
-        self.turbidityEnableButton = QtWidgets.QRadioButton(parent=self.layoutWidget_2)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.turbidityEnableButton.setFont(font)
+        self.turbidityEnableButton = QtWidgets.QRadioButton(parent=self.turbidityFrame)
+        self.turbidityEnableButton.setFont(font12)
         self.turbidityEnableButton.setObjectName("turbidityEnableButton")
         self.turbidityEnableHorizLayout.addWidget(self.turbidityEnableButton)
-        self.turbidityMatchGNSSCheckbox = QtWidgets.QCheckBox(parent=self.layoutWidget_2)
+        self.turbidityMatchGNSSCheckbox = QtWidgets.QCheckBox(parent=self.turbidityFrame)
         self.turbidityMatchGNSSCheckbox.setEnabled(False)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.turbidityMatchGNSSCheckbox.setFont(font)
+        self.turbidityMatchGNSSCheckbox.setFont(font12)
         self.turbidityMatchGNSSCheckbox.setObjectName("turbidityMatchGNSSCheckbox")
         self.turbidityEnableHorizLayout.addWidget(self.turbidityMatchGNSSCheckbox)
         self.turbidityVerticalLayout.addLayout(self.turbidityEnableHorizLayout)
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.turbiditySerialNumberLabel = QtWidgets.QLabel(parent=self.layoutWidget_2)
+        self.turbiditySerialNumberLabel = QtWidgets.QLabel(parent=self.turbidityFrame)
         self.turbiditySerialNumberLabel.setEnabled(False)
         self.turbiditySerialNumberLabel.setObjectName("turbiditySerialNumberLabel")
         self.horizontalLayout_2.addWidget(self.turbiditySerialNumberLabel)
-        self.turbiditySerialNumberSpinBox = QtWidgets.QSpinBox(parent=self.layoutWidget_2)
+        self.turbiditySerialNumberSpinBox = QtWidgets.QSpinBox(parent=self.turbidityFrame)
         self.turbiditySerialNumberSpinBox.setEnabled(False)
         self.turbiditySerialNumberSpinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.turbiditySerialNumberSpinBox.setMaximum(65535)
@@ -799,69 +542,253 @@ class ProgrammerApp(QMainWindow):
         self.turbidityVerticalLayout.addLayout(self.horizontalLayout_2)
         self.turbiditySamplesHorizLayout = QtWidgets.QHBoxLayout()
         self.turbiditySamplesHorizLayout.setObjectName("turbiditySamplesHorizLayout")
-        self.turbidityNumSamplesLabel = QtWidgets.QLabel(parent=self.layoutWidget_2)
+        self.turbidityNumSamplesLabel = QtWidgets.QLabel(parent=self.turbidityFrame)
         self.turbidityNumSamplesLabel.setEnabled(False)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.turbidityNumSamplesLabel.setFont(font)
+        self.turbidityNumSamplesLabel.setFont(font12)
         self.turbidityNumSamplesLabel.setObjectName("turbidityNumSamplesLabel")
         self.turbiditySamplesHorizLayout.addWidget(self.turbidityNumSamplesLabel)
-        self.turbidityNumSamplesSpinBox = QtWidgets.QSpinBox(parent=self.layoutWidget_2)
+        self.turbidityNumSamplesSpinBox = QtWidgets.QSpinBox(parent=self.turbidityFrame)
         self.turbidityNumSamplesSpinBox.setEnabled(False)
-        font = QtGui.QFont()
-        font.setPointSize(12)
-        self.turbidityNumSamplesSpinBox.setFont(font)
+        self.turbidityNumSamplesSpinBox.setFont(font12)
         self.turbidityNumSamplesSpinBox.setMaximum(3600)
         self.turbidityNumSamplesSpinBox.setProperty("value", 1024)
         self.turbidityNumSamplesSpinBox.setObjectName("turbidityNumSamplesSpinBox")
         self.turbiditySamplesHorizLayout.addWidget(self.turbidityNumSamplesSpinBox)
         self.turbidityVerticalLayout.addLayout(self.turbiditySamplesHorizLayout)
+        leftColumn.addWidget(self.turbidityFrame)
 
-        # --- Firmware URL input panel ---
-        self.firmwareUrlFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.firmwareUrlFrame.setGeometry(QtCore.QRect(10, 630, 621, 75))
-        self.firmwareUrlFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.firmwareUrlFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
+        # ---- Iridium frame (left column) ----
+        self.iridiumFrame = styled_frame()
+        self.iridiumFrame.setObjectName("iridiumFrame")
+        self.iridiumVertLayout = QtWidgets.QVBoxLayout(self.iridiumFrame)
+        self.iridiumVertLayout.setContentsMargins(10, 10, 10, 10)
+        self.iridiumVertLayout.setObjectName("iridiumVertLayout")
+        self.iridiumTxTimeHorizLayout = QtWidgets.QHBoxLayout()
+        self.iridiumTxTimeHorizLayout.setObjectName("iridiumTxTimeHorizLayout")
+        self.iridiumTxTimeLabel = QtWidgets.QLabel(parent=self.iridiumFrame)
+        self.iridiumTxTimeLabel.setFont(font12)
+        self.iridiumTxTimeLabel.setObjectName("iridiumTxTimeLabel")
+        self.iridiumTxTimeHorizLayout.addWidget(self.iridiumTxTimeLabel)
+        self.iridiumTxTimeSpinBox = QtWidgets.QSpinBox(parent=self.iridiumFrame)
+        self.iridiumTxTimeSpinBox.setFont(font12)
+        self.iridiumTxTimeSpinBox.setMaximum(60)
+        self.iridiumTxTimeSpinBox.setProperty("value", 5)
+        self.iridiumTxTimeSpinBox.setObjectName("iridiumTxTimeSpinBox")
+        self.iridiumTxTimeHorizLayout.addWidget(self.iridiumTxTimeSpinBox)
+        self.iridiumVertLayout.addLayout(self.iridiumTxTimeHorizLayout)
+        self.iridiumTypeHorizLayoutr = QtWidgets.QHBoxLayout()
+        self.iridiumTypeHorizLayoutr.setObjectName("iridiumTypeHorizLayoutr")
+        self.iridiumTypeComboBox = QtWidgets.QComboBox(parent=self.iridiumFrame)
+        self.iridiumTypeComboBox.setFont(font12)
+        self.iridiumTypeComboBox.setObjectName("iridiumTypeComboBox")
+        self.iridiumTypeHorizLayoutr.addWidget(self.iridiumTypeComboBox)
+        self.iridiumTypeLabel = QtWidgets.QLabel(parent=self.iridiumFrame)
+        self.iridiumTypeLabel.setFont(font12)
+        self.iridiumTypeLabel.setObjectName("iridiumTypeLabel")
+        self.iridiumTypeHorizLayoutr.addWidget(self.iridiumTypeLabel)
+        self.iridiumVertLayout.addLayout(self.iridiumTypeHorizLayoutr)
+        leftColumn.addWidget(self.iridiumFrame)
+
+        # ---- GNSS frame (left column) ----
+        self.gnssFrame = styled_frame()
+        self.gnssFrame.setObjectName("gnssFrame")
+        self.gnssVertLayout = QtWidgets.QVBoxLayout(self.gnssFrame)
+        self.gnssVertLayout.setContentsMargins(10, 10, 10, 10)
+        self.gnssVertLayout.setObjectName("gnssVertLayout")
+        self.gnssSamplesHorizLayout = QtWidgets.QHBoxLayout()
+        self.gnssSamplesHorizLayout.setObjectName("gnssSamplesHorizLayout")
+        self.gnssNumSamplesLabel = QtWidgets.QLabel(parent=self.gnssFrame)
+        self.gnssNumSamplesLabel.setFont(font12)
+        self.gnssNumSamplesLabel.setObjectName("gnssNumSamplesLabel")
+        self.gnssSamplesHorizLayout.addWidget(self.gnssNumSamplesLabel)
+        self.gnssNumSamplesSpinBox = QtWidgets.QSpinBox(parent=self.gnssFrame)
+        self.gnssNumSamplesSpinBox.setFont(font12)
+        self.gnssNumSamplesSpinBox.setMaximum(32768)
+        self.gnssNumSamplesSpinBox.setProperty("value", 4096)
+        self.gnssNumSamplesSpinBox.setObjectName("gnssNumSamplesSpinBox")
+        self.gnssSamplesHorizLayout.addWidget(self.gnssNumSamplesSpinBox)
+        self.gnssVertLayout.addLayout(self.gnssSamplesHorizLayout)
+        self.gnssHighPerformanceModeCheckBox = QtWidgets.QCheckBox(parent=self.gnssFrame)
+        self.gnssHighPerformanceModeCheckBox.setObjectName("gnssHighPerformanceModeCheckBox")
+        self.gnssVertLayout.addWidget(self.gnssHighPerformanceModeCheckBox)
+        self.gnssSampleRateHorizLayout = QtWidgets.QHBoxLayout()
+        self.gnssSampleRateHorizLayout.setObjectName("gnssSampleRateHorizLayout")
+        self.gnssSampleRateComboBox = QtWidgets.QComboBox(parent=self.gnssFrame)
+        self.gnssSampleRateComboBox.setFont(font12)
+        self.gnssSampleRateComboBox.setObjectName("gnssSampleRateComboBox")
+        self.gnssSampleRateHorizLayout.addWidget(self.gnssSampleRateComboBox)
+        self.gnssSampleRateLabel = QtWidgets.QLabel(parent=self.gnssFrame)
+        self.gnssSampleRateLabel.setFont(font12)
+        self.gnssSampleRateLabel.setObjectName("gnssSampleRateLabel")
+        self.gnssSampleRateHorizLayout.addWidget(self.gnssSampleRateLabel)
+        self.gnssVertLayout.addLayout(self.gnssSampleRateHorizLayout)
+        leftColumn.addWidget(self.gnssFrame)
+
+        leftColumn.addStretch(1)
+
+        # ---- Graphics view (right column) ----
+        self.graphicsView = QtWidgets.QGraphicsView(parent=self.centralwidget)
+        self.graphicsView.setFixedHeight(231)
+        self.graphicsView.setObjectName("graphicsView")
+        rightColumn.addWidget(self.graphicsView)
+
+        # ---- Timing frame (right column) ----
+        self.timingFrame = styled_frame()
+        self.timingFrame.setObjectName("timingFrame")
+        self.timingVertLayout = QtWidgets.QVBoxLayout(self.timingFrame)
+        self.timingVertLayout.setContentsMargins(10, 10, 10, 10)
+        self.timingVertLayout.setObjectName("timingVertLayout")
+        self.dutyCycleHorizLayout = QtWidgets.QHBoxLayout()
+        self.dutyCycleHorizLayout.setObjectName("dutyCycleHorizLayout")
+        self.dutyCycleLabel = QtWidgets.QLabel(parent=self.timingFrame)
+        self.dutyCycleLabel.setFont(font12)
+        self.dutyCycleLabel.setObjectName("dutyCycleLabel")
+        self.dutyCycleHorizLayout.addWidget(self.dutyCycleLabel)
+        self.dutyCycleSpinBox = QtWidgets.QSpinBox(parent=self.timingFrame)
+        self.dutyCycleSpinBox.setFont(font12)
+        self.dutyCycleSpinBox.setMaximum(1440)
+        self.dutyCycleSpinBox.setProperty("value", 30)
+        self.dutyCycleSpinBox.setObjectName("dutyCycleSpinBox")
+        self.dutyCycleHorizLayout.addWidget(self.dutyCycleSpinBox)
+        self.timingVertLayout.addLayout(self.dutyCycleHorizLayout)
+        self.gnssBufferTimeHorizLayout = QtWidgets.QHBoxLayout()
+        self.gnssBufferTimeHorizLayout.setObjectName("gnssBufferTimeHorizLayout")
+        self.gnssMaxAcqusitionTimeLabel = QtWidgets.QLabel(parent=self.timingFrame)
+        self.gnssMaxAcqusitionTimeLabel.setFont(font12)
+        self.gnssMaxAcqusitionTimeLabel.setWhatsThis("")
+        self.gnssMaxAcqusitionTimeLabel.setObjectName("gnssMaxAcqusitionTimeLabel")
+        self.gnssBufferTimeHorizLayout.addWidget(self.gnssMaxAcqusitionTimeLabel)
+        self.gnssMaxAcquisitionTimeSpinBox = QtWidgets.QSpinBox(parent=self.timingFrame)
+        self.gnssMaxAcquisitionTimeSpinBox.setFont(font12)
+        self.gnssMaxAcquisitionTimeSpinBox.setWhatsThis("")
+        self.gnssMaxAcquisitionTimeSpinBox.setMaximum(10)
+        self.gnssMaxAcquisitionTimeSpinBox.setProperty("value", 5)
+        self.gnssMaxAcquisitionTimeSpinBox.setObjectName("gnssMaxAcquisitionTimeSpinBox")
+        self.gnssBufferTimeHorizLayout.addWidget(self.gnssMaxAcquisitionTimeSpinBox)
+        self.timingVertLayout.addLayout(self.gnssBufferTimeHorizLayout)
+        self.trackingNumberHorizLayourt = QtWidgets.QHBoxLayout()
+        self.trackingNumberHorizLayourt.setObjectName("trackingNumberHorizLayourt")
+        self.trackingNumberLabel = QtWidgets.QLabel(parent=self.timingFrame)
+        self.trackingNumberLabel.setFont(font12)
+        self.trackingNumberLabel.setObjectName("trackingNumberLabel")
+        self.trackingNumberHorizLayourt.addWidget(self.trackingNumberLabel)
+        self.trackingNumberSpinBox = QtWidgets.QSpinBox(parent=self.timingFrame)
+        self.trackingNumberSpinBox.setFont(font12)
+        self.trackingNumberSpinBox.setMaximum(1000)
+        self.trackingNumberSpinBox.setProperty("value", 100)
+        self.trackingNumberSpinBox.setObjectName("trackingNumberSpinBox")
+        self.trackingNumberHorizLayourt.addWidget(self.trackingNumberSpinBox)
+        self.timingVertLayout.addLayout(self.trackingNumberHorizLayourt)
+        rightColumn.addWidget(self.timingFrame)
+
+        # --- ST-LINK device selection frame (right column) ---
+        self.stlinkFrame = styled_frame()
+        self.stlinkFrame.setObjectName("stlinkFrame")
+        self.stlinkVertLayout = QtWidgets.QVBoxLayout(self.stlinkFrame)
+        self.stlinkVertLayout.setContentsMargins(10, 10, 10, 10)
+        self.stlinkVertLayout.setObjectName("stlinkVertLayout")
+        self.stlinkLabelHorizLayout = QtWidgets.QHBoxLayout()
+        self.stlinkLabelHorizLayout.setObjectName("stlinkLabelHorizLayout")
+        self.stlinkLabel = QtWidgets.QLabel(parent=self.stlinkFrame)
+        self.stlinkLabel.setFont(font12)
+        self.stlinkLabel.setObjectName("stlinkLabel")
+        self.stlinkLabelHorizLayout.addWidget(self.stlinkLabel)
+        self.stlinkRefreshButton = QtWidgets.QPushButton(parent=self.stlinkFrame)
+        self.stlinkRefreshButton.setObjectName("stlinkRefreshButton")
+        self.stlinkRefreshButton.setMaximumWidth(70)
+        self.stlinkLabelHorizLayout.addWidget(self.stlinkRefreshButton)
+        self.stlinkVertLayout.addLayout(self.stlinkLabelHorizLayout)
+        self.stlinkComboBox = QtWidgets.QComboBox(parent=self.stlinkFrame)
+        self.stlinkComboBox.setFont(font11)
+        self.stlinkComboBox.setObjectName("stlinkComboBox")
+        self.stlinkVertLayout.addWidget(self.stlinkComboBox)
+
+        # --- Action buttons frame (right column) ---
+        self.actionFrame = styled_frame()
+        self.actionFrame.setObjectName("actionFrame")
+        self.actionVertLayout = QtWidgets.QVBoxLayout(self.actionFrame)
+        self.actionVertLayout.setContentsMargins(10, 10, 10, 10)
+        self.actionVertLayout.setObjectName("actionVertLayout")
+        self.verifyButton = QtWidgets.QPushButton(parent=self.actionFrame)
+        self.verifyButton.setFont(font12)
+        self.verifyButton.setObjectName("verifyButton")
+        self.actionVertLayout.addWidget(self.verifyButton)
+        self.programButton = QtWidgets.QPushButton(parent=self.actionFrame)
+        self.programButton.setFont(font12)
+        self.programButton.setObjectName("programButton")
+        self.actionVertLayout.addWidget(self.programButton)
+        self.downloadConfigFile = QtWidgets.QPushButton(parent=self.actionFrame)
+        self.downloadConfigFile.setObjectName("downloadConfigFile")
+        self.actionVertLayout.addWidget(self.downloadConfigFile)
+        rightColumn.addWidget(self.actionFrame)
+
+        rightColumn.addStretch(1)
+
+        # --- Combined firmware panel: file selection + URL download (full width) ---
+        self.firmwareUrlFrame = styled_frame()
         self.firmwareUrlFrame.setObjectName("firmwareUrlFrame")
+        self.firmwareUrlVertLayout = QtWidgets.QVBoxLayout(self.firmwareUrlFrame)
+        self.firmwareUrlVertLayout.setContentsMargins(8, 5, 8, 5)
+        self.firmwareUrlVertLayout.setSpacing(4)
 
-        self.firmwareUrlVertLayoutWidget = QtWidgets.QWidget(parent=self.firmwareUrlFrame)
-        self.firmwareUrlVertLayoutWidget.setGeometry(QtCore.QRect(8, 5, 605, 65))
-        self.firmwareUrlVertLayout = QtWidgets.QVBoxLayout(self.firmwareUrlVertLayoutWidget)
-        self.firmwareUrlVertLayout.setContentsMargins(0, 0, 0, 0)
-        self.firmwareUrlVertLayout.setSpacing(2)
+        # Row 1: "Available Firmware:" label + Refresh button
+        self.firmwareLabelRow = QtWidgets.QHBoxLayout()
+        self.firmwareLabel = QtWidgets.QLabel(parent=self.firmwareUrlFrame)
+        self.firmwareLabel.setFont(font12)
+        self.firmwareLabel.setObjectName("firmwareLabel")
+        self.firmwareLabelRow.addWidget(self.firmwareLabel)
+        self.firmwareRefreshButton = QtWidgets.QPushButton(parent=self.firmwareUrlFrame)
+        self.firmwareRefreshButton.setObjectName("firmwareRefreshButton")
+        self.firmwareRefreshButton.setMaximumWidth(70)
+        self.firmwareLabelRow.addWidget(self.firmwareRefreshButton)
+        self.firmwareUrlVertLayout.addLayout(self.firmwareLabelRow)
 
-        # Row 1: URL entry + buttons
+        # Row 2: Firmware file combo box
+        self.firmwareComboBox = QtWidgets.QComboBox(parent=self.firmwareUrlFrame)
+        self.firmwareComboBox.setFont(font11)
+        self.firmwareComboBox.setObjectName("firmwareComboBox")
+        self.firmwareUrlVertLayout.addWidget(self.firmwareComboBox)
+
+        # Row 3: "Firmware URL:" label + Download button + Reset button
         self.firmwareUrlRow = QtWidgets.QHBoxLayout()
-        self.firmwareUrlLabel = QtWidgets.QLabel(parent=self.firmwareUrlVertLayoutWidget)
+        self.firmwareUrlLabel = QtWidgets.QLabel(parent=self.firmwareUrlFrame)
         self.firmwareUrlLabel.setObjectName("firmwareUrlLabel")
         self.firmwareUrlRow.addWidget(self.firmwareUrlLabel)
+        self.firmwareUrlRow.addStretch(1)
+        self.useUrlButton = QtWidgets.QPushButton(parent=self.firmwareUrlFrame)
+        self.useUrlButton.setObjectName("useUrlButton")
+        self.firmwareUrlRow.addWidget(self.useUrlButton)
+        self.resetUrlButton = QtWidgets.QPushButton(parent=self.firmwareUrlFrame)
+        self.resetUrlButton.setObjectName("resetUrlButton")
+        self.firmwareUrlRow.addWidget(self.resetUrlButton)
+        self.firmwareUrlVertLayout.addLayout(self.firmwareUrlRow)
 
-        self.firmwareUrlLineEdit = QtWidgets.QLineEdit(parent=self.firmwareUrlVertLayoutWidget)
+        # Row 4: URL text entry (full width)
+        self.firmwareUrlLineEdit = QtWidgets.QLineEdit(parent=self.firmwareUrlFrame)
         self.firmwareUrlLineEdit.setObjectName("firmwareUrlLineEdit")
         self.firmwareUrlLineEdit.setText(DEFAULT_FIRMWARE_URL)
         self.firmwareUrlLineEdit.setClearButtonEnabled(True)
-        self.firmwareUrlRow.addWidget(self.firmwareUrlLineEdit, stretch=1)
+        self.firmwareUrlVertLayout.addWidget(self.firmwareUrlLineEdit)
 
-        self.useUrlButton = QtWidgets.QPushButton(parent=self.firmwareUrlVertLayoutWidget)
-        self.useUrlButton.setObjectName("useUrlButton")
-        self.firmwareUrlRow.addWidget(self.useUrlButton)
+        mainLayout.addWidget(self.stlinkFrame)
+        mainLayout.addWidget(self.firmwareUrlFrame)
 
-        self.resetUrlButton = QtWidgets.QPushButton(parent=self.firmwareUrlVertLayoutWidget)
-        self.resetUrlButton.setObjectName("resetUrlButton")
-        self.firmwareUrlRow.addWidget(self.resetUrlButton)
-
-        self.firmwareUrlVertLayout.addLayout(self.firmwareUrlRow)
-
-        # Row 2: active firmware file display (always shows what will be flashed)
-        self.activeFirmwareLabel = QtWidgets.QLabel(parent=self.firmwareUrlVertLayoutWidget)
-        self.activeFirmwareLabel.setObjectName("activeFirmwareLabel")
-        self.activeFirmwareLabel.setWordWrap(True)
-        self.activeFirmwareLabel.setStyleSheet("font-size: 11px;")
-        self.firmwareUrlVertLayout.addWidget(self.activeFirmwareLabel)
-
+        # ---- Status text area (full width, expands) ----
         self.statusTextEdit = QtWidgets.QTextEdit(parent=self.centralwidget)
-        self.statusTextEdit.setGeometry(QtCore.QRect(10, 710, 621, 221))
         self.statusTextEdit.setObjectName("statusTextEdit")
+        self.statusTextEdit.setReadOnly(True)
+        self.statusTextEdit.setMinimumHeight(150)
+        self.statusTextEdit.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding,
+                                          QtWidgets.QSizePolicy.Policy.Expanding)
+        mainLayout.addWidget(self.statusTextEdit, stretch=1)
+
+        # ---- Config frames list (used for bulk enable/disable) ----
+        self._config_frames = [
+            self.ctFrame, self.lightFrame, self.accelerometerFrame,
+            self.turbidityFrame, self.iridiumFrame, self.gnssFrame,
+            self.timingFrame,
+        ]
+
         self.setCentralWidget(self.centralwidget)
 
         self.retranslateUi(self)
@@ -898,11 +825,11 @@ class ProgrammerApp(QMainWindow):
         self.turbidityMatchGNSSCheckbox.setText(_translate("MainWindow", "Match GNSS period"))
         self.turbiditySerialNumberLabel.setText(_translate("MainWindow", "Serial Number"))
         self.turbidityNumSamplesLabel.setText(_translate("MainWindow", "Number of samples @ 1Hz"))
+        self.firmwareLabel.setText(_translate("MainWindow", "Available Firmware:"))
+        self.firmwareRefreshButton.setText(_translate("MainWindow", "Refresh"))
         self.firmwareUrlLabel.setText(_translate("MainWindow", "Firmware URL:"))
         self.useUrlButton.setText(_translate("MainWindow", "Download"))
         self.resetUrlButton.setText(_translate("MainWindow", "Reset to default"))
-        self.activeFirmwareLabel.setText(
-            _translate("MainWindow", "Active firmware: (none — download a file to continue)"))
 
     def adjust_font_color_based_on_background(self, text_edit: QTextEdit):
         """Adjusts font color in a QTextEdit based on background color."""
@@ -1005,9 +932,8 @@ class ProgrammerApp(QMainWindow):
         else:
             self.appendError("Unable to pull firmware from GitHub!")
 
-        # Initialize the "active firmware file" display and Worker path based
-        # on what actually exists on disk after startup.
-        self.updateActiveFirmwareDisplay()
+        # Populate the firmware file dropdown and select the active firmware.
+        self.refreshFirmwareList()
 
     def saveConfigAsFile(self):
         file_dialog = QFileDialog(self)
@@ -1237,6 +1163,9 @@ class ProgrammerApp(QMainWindow):
         self.stlinkComboBox.currentIndexChanged.connect(self.onStlinkSelected)
         self.stlinkRefreshButton.clicked.connect(self.find_usb_port)
 
+        self.firmwareComboBox.currentIndexChanged.connect(self.onFirmwareSelected)
+        self.firmwareRefreshButton.clicked.connect(self.refreshFirmwareList)
+
         self.verifyButton.clicked.connect(self.verifySettings)
         self.programButton.clicked.connect(self.programDevice)
         self.downloadConfigFile.clicked.connect(self.saveConfigAsFile)
@@ -1401,6 +1330,90 @@ class ProgrammerApp(QMainWindow):
             self.stlink_port = ""
             self.stlink_serial = ""
 
+    def refreshFirmwareList(self):
+        """Scan the firmware directory for .elf files and populate the dropdown."""
+        firmware_dir = get_resource_path('firmware')
+        elf_files = []
+
+        if os.path.isdir(firmware_dir):
+            for path in sorted(glob_module.glob(os.path.join(firmware_dir, '*.elf'))):
+                try:
+                    stat = os.stat(path)
+                    size_kb = stat.st_size / 1024.0
+                    mtime = datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M')
+                    elf_files.append({
+                        'path': path,
+                        'name': os.path.basename(path),
+                        'size_kb': size_kb,
+                        'mtime': mtime,
+                    })
+                except OSError:
+                    continue
+
+        self.firmware_files = elf_files
+
+        self.firmwareComboBox.blockSignals(True)
+        self.firmwareComboBox.clear()
+
+        if elf_files:
+            for f in elf_files:
+                label = "{name}  ({mtime}, {kb:.1f} KB)".format(
+                    name=f['name'], mtime=f['mtime'], kb=f['size_kb'])
+                self.firmwareComboBox.addItem(label)
+            self.firmwareComboBox.setEnabled(True)
+            self.firmwareComboBox.blockSignals(False)
+            # If there's a currently active firmware, try to select it
+            selected = -1
+            if self.firmware_path:
+                basename = os.path.basename(self.firmware_path)
+                for i, f in enumerate(elf_files):
+                    if f['name'] == basename:
+                        selected = i
+                        break
+            if selected >= 0:
+                self.firmwareComboBox.setCurrentIndex(selected)
+            else:
+                self.firmwareComboBox.setCurrentIndex(0)
+            self.onFirmwareSelected(self.firmwareComboBox.currentIndex())
+        else:
+            self.firmwareComboBox.addItem("No .elf files found in firmware/")
+            self.firmwareComboBox.setEnabled(False)
+            self.firmwareComboBox.blockSignals(False)
+            self.firmware_path = ""
+            self.programButton.setDisabled(True)
+
+    def _setConfigEnabled(self, enabled):
+        """Enable or disable all configuration-related frames.
+
+        When disabled, config frames are greyed out, Verify and Download Config
+        buttons are hidden, and Program is directly enabled (no verify needed).
+        """
+        self._config_needed = enabled
+
+        for frame in self._config_frames:
+            frame.setEnabled(enabled)
+
+        if enabled:
+            self.verifyButton.setVisible(True)
+            self.downloadConfigFile.setVisible(True)
+            self.resetVerifyButton()
+        else:
+            self.verifyButton.setVisible(False)
+            self.downloadConfigFile.setVisible(False)
+            if self.firmware_path and os.path.isfile(self.firmware_path):
+                self.programButton.setEnabled(True)
+            else:
+                self.programButton.setDisabled(True)
+
+    def onFirmwareSelected(self, index):
+        """Handle firmware file selection from the dropdown."""
+        if not self.firmware_files or index < 0 or index >= len(self.firmware_files):
+            self.firmware_path = ""
+            return
+        self.firmware_path = self.firmware_files[index]['path']
+        self.worker.setFirmwarePath(self.firmware_path)
+        self._setConfigEnabled(firmware_needs_config(self.firmware_path))
+
     def onStlinkSelected(self, index):
         """Handle ST-LINK device selection from the dropdown."""
         if not self.stlink_devices or index < 0 or index >= len(self.stlink_devices):
@@ -1474,6 +1487,9 @@ class ProgrammerApp(QMainWindow):
             self.writeText("Settings verified. You did a great job.")
 
     def resetVerifyButton(self):
+        if not self._config_needed:
+            # No config means no verify step; Program stays directly enabled
+            return
         self.programButton.setDisabled(True)
         self.downloadConfigFile.setDisabled(True)
         # Reset button text to default
@@ -1511,28 +1527,12 @@ class ProgrammerApp(QMainWindow):
         self.statusTextEdit.append(string)
 
     def updateActiveFirmwareDisplay(self):
-        """Refresh the 'Active firmware' label and gate the Program button on it.
+        """Refresh the firmware dropdown and gate the Program button.
 
         The Program button should only be usable if we actually have a firmware
         file on disk to flash.
         """
-        path = self.firmware_path
-        if path and os.path.isfile(path):
-            size_kb = os.path.getsize(path) / 1024.0
-            self.activeFirmwareLabel.setText(
-                "Active firmware: {p}  ({kb:.1f} KB)".format(p=path, kb=size_kb))
-            self.activeFirmwareLabel.setStyleSheet(
-                "font-size: 11px; color: #0a7a2a;")
-            # Hand the path to the worker so the next Program click uses it
-            self.worker.setFirmwarePath(path)
-        else:
-            self.activeFirmwareLabel.setText(
-                "Active firmware: (none — download a file to continue)")
-            self.activeFirmwareLabel.setStyleSheet(
-                "font-size: 11px; color: #a00;")
-            # No firmware on disk: force-disable the Program button regardless
-            # of whether settings have been verified.
-            self.programButton.setDisabled(True)
+        self.refreshFirmwareList()
 
     def onResetUrlClicked(self):
         self.firmwareUrlLineEdit.setText(DEFAULT_FIRMWARE_URL)
@@ -1619,17 +1619,21 @@ class ProgrammerApp(QMainWindow):
             self.updateActiveFirmwareDisplay()
             return
 
-        self.assembleBinaryConfigFile()
+        if self._config_needed:
+            self.assembleBinaryConfigFile()
 
         # Hand the current firmware path and ST-LINK serial to the worker
         self.worker.setFirmwarePath(self.firmware_path)
         self.worker.setStlinkSerial(dev['serial'])
+        self.worker.setFlashConfig(self._config_needed)
 
         selected_label = self.stlinkComboBox.currentText()
+        config_note = " (with configuration)" if self._config_needed else " (firmware only)"
         self.writeText(
             "Running STM32 Programmer CLI, please wait.\n"
             "Using: {dev}\n"
-            "Flashing firmware: {p}".format(dev=selected_label, p=self.firmware_path))
+            "Flashing firmware{note}: {p}".format(
+                dev=selected_label, note=config_note, p=self.firmware_path))
 
         self.disableGUI()
         # Run the worker thread so the program will be non-blocking
@@ -1658,42 +1662,32 @@ class ProgrammerApp(QMainWindow):
         self.verifyButton.setDisabled(True)
         self.programButton.setDisabled(True)
         self.downloadConfigFile.setDisabled(True)
-        # Lock URL controls while flashing so the firmware path can't change mid-run
+        # Lock firmware and URL controls while flashing
+        self.firmwareComboBox.setDisabled(True)
+        self.firmwareRefreshButton.setDisabled(True)
         self.firmwareUrlLineEdit.setDisabled(True)
         self.useUrlButton.setDisabled(True)
         self.resetUrlButton.setDisabled(True)
 
     def reenableGUI(self):
-        self.ctEnableButton.setEnabled(True)
+        # Re-enable config frames only if firmware needs config
+        if self._config_needed:
+            for frame in self._config_frames:
+                frame.setEnabled(True)
+            # Re-apply per-sensor enable/disable state
+            self.onLightEnabledClick()
+            self.onTurbidityEnabledClick()
+            self.verifyButton.setEnabled(True)
+            self.downloadConfigFile.setEnabled(True)
+            self.resetVerifyButton()
+        else:
+            self.programButton.setEnabled(True)
 
-        self.tempEnableButton.setEnabled(True)
-
-        self.lightEnableButton.setEnabled(True)
-        if self.lightEnableButton.isChecked():
-            self.lightMatchGNSSCheckbox.setEnabled(True)
-            self.lightNumSamplesSpinBox.setEnabled(True)
-
-        self.accelerometerEnableButton.setEnabled(True)
-
-        self.turbidityEnableButton.setEnabled(True)
-        if self.turbidityEnableButton.isChecked():
-            self.turbidityMatchGNSSCheckbox.setEnabled(True)
-            self.turbidityNumSamplesSpinBox.setEnabled(True)
-
-        self.iridiumTxTimeSpinBox.setEnabled(True)
-        self.iridiumTypeComboBox.setEnabled(True)
-        self.gnssNumSamplesSpinBox.setEnabled(True)
-        self.gnssHighPerformanceModeCheckBox.setEnabled(True)
-        self.gnssSampleRateComboBox.setEnabled(True)
-        self.dutyCycleSpinBox.setEnabled(True)
-        self.gnssMaxAcquisitionTimeSpinBox.setEnabled(True)
-        self.trackingNumberSpinBox.setEnabled(True)
+        # Always re-enable non-config controls
         self.stlinkComboBox.setEnabled(True)
         self.stlinkRefreshButton.setEnabled(True)
-        self.verifyButton.setEnabled(True)
-        self.programButton.setEnabled(True)
-        self.downloadConfigFile.setEnabled(True)
-        # Unlock URL controls after flashing completes
+        self.firmwareComboBox.setEnabled(True)
+        self.firmwareRefreshButton.setEnabled(True)
         self.firmwareUrlLineEdit.setEnabled(True)
         self.useUrlButton.setEnabled(True)
         self.resetUrlButton.setEnabled(True)
