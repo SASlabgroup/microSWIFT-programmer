@@ -127,9 +127,8 @@ def filename_from_url(url):
     return name
 
 
-def download_microSWIFT_firmware(url=None):
-    """Download firmware from `url` (defaults to DEFAULT_FIRMWARE_URL).
-
+def download_microSWIFT_firmware(url):
+     """Download firmware from `url` .
     Returns (success, local_file_path, error_message). `local_file_path` is
     populated even on failure (to the path that *would* have been used) so the
     caller can display it; `error_message` is empty on success.
@@ -384,13 +383,9 @@ class ProgrammerApp(QMainWindow):
     stlink_serial = ""
     configFilePath = None
 
-    def __init__(self, bypasss_firmware_update, firmware_updated, firmware_path=""):
+    def __init__(self):
         super().__init__()
-        self.bypass_firmware_update = bypasss_firmware_update
-        self.firmware_updated = firmware_updated
-        # Path to the firmware file currently queued for flashing. Set either by
-        # the initial download at startup or by the user clicking "Download".
-        self.firmware_path = firmware_path
+        self.firmware_path = get_firmware_path("microSWIFT_V2.2.elf")
         self.configFilePath = get_firmware_path("config.bin")
         self.stlink_devices = []
         self.firmware_files = []
@@ -399,21 +394,20 @@ class ProgrammerApp(QMainWindow):
 
     def setupUi(self):
         self.setObjectName("MainWindow")
-        self.resize(640, 900)
         self.centralwidget = QtWidgets.QWidget()
         self.centralwidget.setObjectName("centralwidget")
 
         # ---- Top-level layout ----
         mainLayout = QtWidgets.QVBoxLayout(self.centralwidget)
-        mainLayout.setContentsMargins(10, 10, 10, 10)
-        mainLayout.setSpacing(8)
+        mainLayout.setContentsMargins(4, 4, 4, 4)
+        mainLayout.setSpacing(4)
 
         columnsLayout = QtWidgets.QHBoxLayout()
-        columnsLayout.setSpacing(10)
+        columnsLayout.setSpacing(4)
         leftColumn = QtWidgets.QVBoxLayout()
-        leftColumn.setSpacing(8)
+        leftColumn.setSpacing(4)
         rightColumn = QtWidgets.QVBoxLayout()
-        rightColumn.setSpacing(8)
+        rightColumn.setSpacing(4)
         columnsLayout.addLayout(leftColumn, stretch=1)
         columnsLayout.addLayout(rightColumn, stretch=1)
         mainLayout.addLayout(columnsLayout)
@@ -436,7 +430,8 @@ class ProgrammerApp(QMainWindow):
         self.ctFrame = styled_frame()
         self.ctFrame.setObjectName("ctFrame")
         self.ctVertLayout = QtWidgets.QVBoxLayout(self.ctFrame)
-        self.ctVertLayout.setContentsMargins(10, 10, 10, 10)
+        self.ctVertLayout.setSpacing(4)
+        self.ctVertLayout.setContentsMargins(4, 4, 4, 4)
         self.ctVertLayout.setObjectName("ctVertLayout")
         self.ctEnableButton = QtWidgets.QRadioButton(parent=self.ctFrame)
         self.ctEnableButton.setFont(font12)
@@ -454,7 +449,8 @@ class ProgrammerApp(QMainWindow):
         self.lightFrame = styled_frame()
         self.lightFrame.setObjectName("lightFrame")
         self.lightVerticalLayout = QtWidgets.QVBoxLayout(self.lightFrame)
-        self.lightVerticalLayout.setContentsMargins(10, 10, 10, 6)
+        self.lightVerticalLayout.setSpacing(4)
+        self.lightVerticalLayout.setContentsMargins(4, 4, 4, 4)
         self.lightVerticalLayout.setObjectName("lightVerticalLayout")
         self.lightEnableHorizLayout = QtWidgets.QHBoxLayout()
         self.lightEnableHorizLayout.setObjectName("lightEnableHorizLayout")
@@ -500,7 +496,8 @@ class ProgrammerApp(QMainWindow):
         self.accelerometerFrame = styled_frame()
         self.accelerometerFrame.setObjectName("accelerometerFrame")
         self.accelerometerVertLayout = QtWidgets.QVBoxLayout(self.accelerometerFrame)
-        self.accelerometerVertLayout.setContentsMargins(10, 10, 10, 10)
+        self.accelerometerVertLayout.setSpacing(4)
+        self.accelerometerVertLayout.setContentsMargins(4, 4, 4, 4)
         self.accelerometerVertLayout.setObjectName("accelerometerVertLayout")
         self.accelerometerEnableButton = QtWidgets.QRadioButton(parent=self.accelerometerFrame)
         self.accelerometerEnableButton.setFont(font12)
@@ -513,7 +510,8 @@ class ProgrammerApp(QMainWindow):
         self.turbidityFrame = styled_frame()
         self.turbidityFrame.setObjectName("turbidityFrame")
         self.turbidityVerticalLayout = QtWidgets.QVBoxLayout(self.turbidityFrame)
-        self.turbidityVerticalLayout.setContentsMargins(10, 10, 10, 6)
+        self.turbidityVerticalLayout.setSpacing(4)
+        self.turbidityVerticalLayout.setContentsMargins(4, 4, 4, 4)
         self.turbidityVerticalLayout.setObjectName("turbidityVerticalLayout")
         self.turbidityEnableHorizLayout = QtWidgets.QHBoxLayout()
         self.turbidityEnableHorizLayout.setObjectName("turbidityEnableHorizLayout")
@@ -561,7 +559,8 @@ class ProgrammerApp(QMainWindow):
         self.iridiumFrame = styled_frame()
         self.iridiumFrame.setObjectName("iridiumFrame")
         self.iridiumVertLayout = QtWidgets.QVBoxLayout(self.iridiumFrame)
-        self.iridiumVertLayout.setContentsMargins(10, 10, 10, 10)
+        self.iridiumVertLayout.setSpacing(4)
+        self.iridiumVertLayout.setContentsMargins(4, 4, 4, 4)
         self.iridiumVertLayout.setObjectName("iridiumVertLayout")
         self.iridiumTxTimeHorizLayout = QtWidgets.QHBoxLayout()
         self.iridiumTxTimeHorizLayout.setObjectName("iridiumTxTimeHorizLayout")
@@ -593,7 +592,8 @@ class ProgrammerApp(QMainWindow):
         self.gnssFrame = styled_frame()
         self.gnssFrame.setObjectName("gnssFrame")
         self.gnssVertLayout = QtWidgets.QVBoxLayout(self.gnssFrame)
-        self.gnssVertLayout.setContentsMargins(10, 10, 10, 10)
+        self.gnssVertLayout.setSpacing(4)
+        self.gnssVertLayout.setContentsMargins(4, 4, 4, 4)
         self.gnssVertLayout.setObjectName("gnssVertLayout")
         self.gnssSamplesHorizLayout = QtWidgets.QHBoxLayout()
         self.gnssSamplesHorizLayout.setObjectName("gnssSamplesHorizLayout")
@@ -636,7 +636,8 @@ class ProgrammerApp(QMainWindow):
         self.timingFrame = styled_frame()
         self.timingFrame.setObjectName("timingFrame")
         self.timingVertLayout = QtWidgets.QVBoxLayout(self.timingFrame)
-        self.timingVertLayout.setContentsMargins(10, 10, 10, 10)
+        self.timingVertLayout.setSpacing(4)
+        self.timingVertLayout.setContentsMargins(4, 4, 4, 4)
         self.timingVertLayout.setObjectName("timingVertLayout")
         self.dutyCycleHorizLayout = QtWidgets.QHBoxLayout()
         self.dutyCycleHorizLayout.setObjectName("dutyCycleHorizLayout")
@@ -685,7 +686,8 @@ class ProgrammerApp(QMainWindow):
         self.stlinkFrame = styled_frame()
         self.stlinkFrame.setObjectName("stlinkFrame")
         self.stlinkVertLayout = QtWidgets.QVBoxLayout(self.stlinkFrame)
-        self.stlinkVertLayout.setContentsMargins(10, 10, 10, 10)
+        self.stlinkVertLayout.setSpacing(4)
+        self.stlinkVertLayout.setContentsMargins(4, 4, 4, 4)
         self.stlinkVertLayout.setObjectName("stlinkVertLayout")
         self.stlinkLabelHorizLayout = QtWidgets.QHBoxLayout()
         self.stlinkLabelHorizLayout.setObjectName("stlinkLabelHorizLayout")
@@ -707,7 +709,8 @@ class ProgrammerApp(QMainWindow):
         self.actionFrame = styled_frame()
         self.actionFrame.setObjectName("actionFrame")
         self.actionVertLayout = QtWidgets.QVBoxLayout(self.actionFrame)
-        self.actionVertLayout.setContentsMargins(10, 10, 10, 10)
+        self.stlinkVertLayout.setSpacing(4)
+        self.actionVertLayout.setContentsMargins(4, 4, 4, 4)
         self.actionVertLayout.setObjectName("actionVertLayout")
         self.verifyButton = QtWidgets.QPushButton(parent=self.actionFrame)
         self.verifyButton.setFont(font12)
@@ -728,7 +731,7 @@ class ProgrammerApp(QMainWindow):
         self.firmwareUrlFrame = styled_frame()
         self.firmwareUrlFrame.setObjectName("firmwareUrlFrame")
         self.firmwareUrlVertLayout = QtWidgets.QVBoxLayout(self.firmwareUrlFrame)
-        self.firmwareUrlVertLayout.setContentsMargins(8, 5, 8, 5)
+        self.firmwareUrlVertLayout.setContentsMargins(4, 4, 4, 4)
         self.firmwareUrlVertLayout.setSpacing(4)
 
         # Row 1: "Available Firmware:" label + Refresh button
@@ -925,12 +928,6 @@ class ProgrammerApp(QMainWindow):
           "\r\r\nPlease ensure you are running the most recent version of this tool."
           "\r\nVisit https://github.com/SASlabgroup/microSWIFT-programmer"))
 
-        if self.bypass_firmware_update:
-            self.appendText("Firmware update bypassed.")
-        elif self.firmware_updated:
-            self.appendText("Firmware successfully updated from GitHub.")
-        else:
-            self.appendError("Unable to pull firmware from GitHub!")
 
         # Populate the firmware file dropdown and select the active firmware.
         self.refreshFirmwareList()
@@ -1702,38 +1699,13 @@ class ProgrammerApp(QMainWindow):
     def threadFinished(self):
         self.thread.quit()
         self.thread.wait()
-        # os.remove(self.configFilePath)
 
 
 def main():
-    firmware_updated = False
-    firmware_path = ""
-
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('--no_firmware_update', action='store_true',
-                        help='Disable automatic firmware download')
-
-    args = parser.parse_args()
-
-    if not args.no_firmware_update:
-        firmware_updated, firmware_path, _err = download_microSWIFT_firmware()
-
-    # If the startup download was skipped or failed, fall back to whatever is
-    # already on disk at the default location (if anything).
-    if not firmware_path:
-        candidate = get_firmware_path("microSWIFT_V2.2.elf")
-        if os.path.isfile(candidate):
-            firmware_path = candidate
-
     app = QtWidgets.QApplication(sys.argv)
-
-    programmer = ProgrammerApp(args.no_firmware_update, firmware_updated, firmware_path)
+    programmer = ProgrammerApp()
     programmer.show()
     sys.exit(app.exec())
-
-
-
 
 
 if __name__ == "__main__":
