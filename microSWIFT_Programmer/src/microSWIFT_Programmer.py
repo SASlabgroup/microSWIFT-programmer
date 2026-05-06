@@ -8,7 +8,6 @@ import requests
 import serial.tools.list_ports
 import re
 import subprocess
-import argparse
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtGui import QTextCharFormat, QColor, QGuiApplication, QFont, QTextCursor
@@ -18,6 +17,13 @@ from PyQt6.QtCore import pyqtSignal, QThread, Qt, QSettings
 
 from datetime import datetime
 import glob as glob_module
+
+from config_types import CTConfig, LightConfig, TurbidityConfig, IridiumConfig, GNSSConfig, TimingConfig
+from config_widgets import (
+    CTConfigWidget, LightConfigWidget, AccelerometerConfigWidget,
+    TurbidityConfigWidget, IridiumConfigWidget, GNSSConfigWidget,
+    TimingConfigWidget,
+)
 
 PROGRAMMER_MAJOR_VERSION = 1
 PROGRAMMER_MINOR_VERSION = 4
@@ -128,14 +134,13 @@ def filename_from_url(url):
 
 
 def download_microSWIFT_firmware(url):
-     """Download firmware from `url` .
+    """
+    Download firmware from `url`.
+
     Returns (success, local_file_path, error_message). `local_file_path` is
     populated even on failure (to the path that *would* have been used) so the
     caller can display it; `error_message` is empty on success.
     """
-    if url is None:
-        url = DEFAULT_FIRMWARE_URL
-
     # Rewrite GitHub blob URLs to raw URLs so users can paste either form
     url, _rewritten = normalize_firmware_url(url)
 
@@ -148,14 +153,12 @@ def download_microSWIFT_firmware(url):
     firmware_dir = get_resource_path('firmware')
     local_file_path = os.path.join(firmware_dir, filename)
 
-    # Ensure the firmware directory exists
     try:
         os.makedirs(firmware_dir, exist_ok=True)
     except OSError as e:
         return False, local_file_path, "Could not create firmware directory: {e}".format(e=e)
 
     try:
-        # Add a timeout (in seconds)
         response = requests.get(url, stream=True, timeout=10)
         response.raise_for_status()  # Raise an error on bad HTTP status
 
@@ -338,7 +341,7 @@ class Worker(QThread):
 
         command = [programmer_path] + connect_args + [
             "--download", firmware_path,
-            "--verify",
+            "--verify", "-rst"
         ]
         return self._run_programmer(command)
 
@@ -426,203 +429,24 @@ class ProgrammerApp(QMainWindow):
         font11 = QtGui.QFont()
         font11.setPointSize(11)
 
-        # ---- CT frame (left column) ----
-        self.ctFrame = styled_frame()
-        self.ctFrame.setObjectName("ctFrame")
-        self.ctVertLayout = QtWidgets.QVBoxLayout(self.ctFrame)
-        self.ctVertLayout.setSpacing(4)
-        self.ctVertLayout.setContentsMargins(4, 4, 4, 4)
-        self.ctVertLayout.setObjectName("ctVertLayout")
-        self.ctEnableButton = QtWidgets.QRadioButton(parent=self.ctFrame)
-        self.ctEnableButton.setFont(font12)
-        self.ctEnableButton.setAutoExclusive(False)
-        self.ctEnableButton.setObjectName("ctEnableButton")
-        self.ctVertLayout.addWidget(self.ctEnableButton)
-        self.tempEnableButton = QtWidgets.QRadioButton(parent=self.ctFrame)
-        self.tempEnableButton.setFont(font12)
-        self.tempEnableButton.setAutoExclusive(False)
-        self.tempEnableButton.setObjectName("tempEnableButton")
-        self.ctVertLayout.addWidget(self.tempEnableButton)
-        leftColumn.addWidget(self.ctFrame)
+        # ---- Config widgets (left column) ----
+        self.ctWidget = CTConfigWidget(parent=self.centralwidget)
+        leftColumn.addWidget(self.ctWidget)
 
-        # ---- Light frame (left column) ----
-        self.lightFrame = styled_frame()
-        self.lightFrame.setObjectName("lightFrame")
-        self.lightVerticalLayout = QtWidgets.QVBoxLayout(self.lightFrame)
-        self.lightVerticalLayout.setSpacing(4)
-        self.lightVerticalLayout.setContentsMargins(4, 4, 4, 4)
-        self.lightVerticalLayout.setObjectName("lightVerticalLayout")
-        self.lightEnableHorizLayout = QtWidgets.QHBoxLayout()
-        self.lightEnableHorizLayout.setObjectName("lightEnableHorizLayout")
-        self.lightEnableButton = QtWidgets.QRadioButton(parent=self.lightFrame)
-        self.lightEnableButton.setFont(font12)
-        self.lightEnableButton.setObjectName("lightEnableButton")
-        self.lightEnableHorizLayout.addWidget(self.lightEnableButton)
-        self.lightMatchGNSSCheckbox = QtWidgets.QCheckBox(parent=self.lightFrame)
-        self.lightMatchGNSSCheckbox.setEnabled(False)
-        self.lightMatchGNSSCheckbox.setFont(font12)
-        self.lightMatchGNSSCheckbox.setObjectName("lightMatchGNSSCheckbox")
-        self.lightEnableHorizLayout.addWidget(self.lightMatchGNSSCheckbox)
-        self.lightVerticalLayout.addLayout(self.lightEnableHorizLayout)
-        self.horizontalLayout = QtWidgets.QHBoxLayout()
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        self.lightGainLabel = QtWidgets.QLabel(parent=self.lightFrame)
-        self.lightGainLabel.setEnabled(False)
-        self.lightGainLabel.setObjectName("lightGainLabel")
-        self.horizontalLayout.addWidget(self.lightGainLabel)
-        self.lightGainComboBox = QtWidgets.QComboBox(parent=self.lightFrame)
-        self.lightGainComboBox.setEnabled(False)
-        self.lightGainComboBox.setObjectName("lightGainComboBox")
-        self.horizontalLayout.addWidget(self.lightGainComboBox)
-        self.lightVerticalLayout.addLayout(self.horizontalLayout)
-        self.lightSamplesHorizLayout = QtWidgets.QHBoxLayout()
-        self.lightSamplesHorizLayout.setObjectName("lightSamplesHorizLayout")
-        self.lightNumSamplesLabel = QtWidgets.QLabel(parent=self.lightFrame)
-        self.lightNumSamplesLabel.setEnabled(False)
-        self.lightNumSamplesLabel.setFont(font12)
-        self.lightNumSamplesLabel.setObjectName("lightNumSamplesLabel")
-        self.lightSamplesHorizLayout.addWidget(self.lightNumSamplesLabel)
-        self.lightNumSamplesSpinBox = QtWidgets.QSpinBox(parent=self.lightFrame)
-        self.lightNumSamplesSpinBox.setEnabled(False)
-        self.lightNumSamplesSpinBox.setFont(font12)
-        self.lightNumSamplesSpinBox.setMaximum(1800)
-        self.lightNumSamplesSpinBox.setProperty("value", 512)
-        self.lightNumSamplesSpinBox.setObjectName("lightNumSamplesSpinBox")
-        self.lightSamplesHorizLayout.addWidget(self.lightNumSamplesSpinBox)
-        self.lightVerticalLayout.addLayout(self.lightSamplesHorizLayout)
-        leftColumn.addWidget(self.lightFrame)
+        self.lightWidget = LightConfigWidget(parent=self.centralwidget)
+        leftColumn.addWidget(self.lightWidget)
 
-        # ---- Accelerometer frame (left column) ----
-        self.accelerometerFrame = styled_frame()
-        self.accelerometerFrame.setObjectName("accelerometerFrame")
-        self.accelerometerVertLayout = QtWidgets.QVBoxLayout(self.accelerometerFrame)
-        self.accelerometerVertLayout.setSpacing(4)
-        self.accelerometerVertLayout.setContentsMargins(4, 4, 4, 4)
-        self.accelerometerVertLayout.setObjectName("accelerometerVertLayout")
-        self.accelerometerEnableButton = QtWidgets.QRadioButton(parent=self.accelerometerFrame)
-        self.accelerometerEnableButton.setFont(font12)
-        self.accelerometerEnableButton.setAutoExclusive(False)
-        self.accelerometerEnableButton.setObjectName("accelerometerEnableButton")
-        self.accelerometerVertLayout.addWidget(self.accelerometerEnableButton)
-        leftColumn.addWidget(self.accelerometerFrame)
+        self.accelWidget = AccelerometerConfigWidget(parent=self.centralwidget)
+        leftColumn.addWidget(self.accelWidget)
 
-        # ---- Turbidity frame (left column) ----
-        self.turbidityFrame = styled_frame()
-        self.turbidityFrame.setObjectName("turbidityFrame")
-        self.turbidityVerticalLayout = QtWidgets.QVBoxLayout(self.turbidityFrame)
-        self.turbidityVerticalLayout.setSpacing(4)
-        self.turbidityVerticalLayout.setContentsMargins(4, 4, 4, 4)
-        self.turbidityVerticalLayout.setObjectName("turbidityVerticalLayout")
-        self.turbidityEnableHorizLayout = QtWidgets.QHBoxLayout()
-        self.turbidityEnableHorizLayout.setObjectName("turbidityEnableHorizLayout")
-        self.turbidityEnableButton = QtWidgets.QRadioButton(parent=self.turbidityFrame)
-        self.turbidityEnableButton.setFont(font12)
-        self.turbidityEnableButton.setObjectName("turbidityEnableButton")
-        self.turbidityEnableHorizLayout.addWidget(self.turbidityEnableButton)
-        self.turbidityMatchGNSSCheckbox = QtWidgets.QCheckBox(parent=self.turbidityFrame)
-        self.turbidityMatchGNSSCheckbox.setEnabled(False)
-        self.turbidityMatchGNSSCheckbox.setFont(font12)
-        self.turbidityMatchGNSSCheckbox.setObjectName("turbidityMatchGNSSCheckbox")
-        self.turbidityEnableHorizLayout.addWidget(self.turbidityMatchGNSSCheckbox)
-        self.turbidityVerticalLayout.addLayout(self.turbidityEnableHorizLayout)
-        self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.turbiditySerialNumberLabel = QtWidgets.QLabel(parent=self.turbidityFrame)
-        self.turbiditySerialNumberLabel.setEnabled(False)
-        self.turbiditySerialNumberLabel.setObjectName("turbiditySerialNumberLabel")
-        self.horizontalLayout_2.addWidget(self.turbiditySerialNumberLabel)
-        self.turbiditySerialNumberSpinBox = QtWidgets.QSpinBox(parent=self.turbidityFrame)
-        self.turbiditySerialNumberSpinBox.setEnabled(False)
-        self.turbiditySerialNumberSpinBox.setButtonSymbols(QtWidgets.QAbstractSpinBox.ButtonSymbols.NoButtons)
-        self.turbiditySerialNumberSpinBox.setMaximum(65535)
-        self.turbiditySerialNumberSpinBox.setObjectName("turbiditySerialNumberSpinBox")
-        self.horizontalLayout_2.addWidget(self.turbiditySerialNumberSpinBox)
-        self.turbidityVerticalLayout.addLayout(self.horizontalLayout_2)
-        self.turbiditySamplesHorizLayout = QtWidgets.QHBoxLayout()
-        self.turbiditySamplesHorizLayout.setObjectName("turbiditySamplesHorizLayout")
-        self.turbidityNumSamplesLabel = QtWidgets.QLabel(parent=self.turbidityFrame)
-        self.turbidityNumSamplesLabel.setEnabled(False)
-        self.turbidityNumSamplesLabel.setFont(font12)
-        self.turbidityNumSamplesLabel.setObjectName("turbidityNumSamplesLabel")
-        self.turbiditySamplesHorizLayout.addWidget(self.turbidityNumSamplesLabel)
-        self.turbidityNumSamplesSpinBox = QtWidgets.QSpinBox(parent=self.turbidityFrame)
-        self.turbidityNumSamplesSpinBox.setEnabled(False)
-        self.turbidityNumSamplesSpinBox.setFont(font12)
-        self.turbidityNumSamplesSpinBox.setMaximum(3600)
-        self.turbidityNumSamplesSpinBox.setProperty("value", 1024)
-        self.turbidityNumSamplesSpinBox.setObjectName("turbidityNumSamplesSpinBox")
-        self.turbiditySamplesHorizLayout.addWidget(self.turbidityNumSamplesSpinBox)
-        self.turbidityVerticalLayout.addLayout(self.turbiditySamplesHorizLayout)
-        leftColumn.addWidget(self.turbidityFrame)
+        self.turbidityWidget = TurbidityConfigWidget(parent=self.centralwidget)
+        leftColumn.addWidget(self.turbidityWidget)
 
-        # ---- Iridium frame (left column) ----
-        self.iridiumFrame = styled_frame()
-        self.iridiumFrame.setObjectName("iridiumFrame")
-        self.iridiumVertLayout = QtWidgets.QVBoxLayout(self.iridiumFrame)
-        self.iridiumVertLayout.setSpacing(4)
-        self.iridiumVertLayout.setContentsMargins(4, 4, 4, 4)
-        self.iridiumVertLayout.setObjectName("iridiumVertLayout")
-        self.iridiumTxTimeHorizLayout = QtWidgets.QHBoxLayout()
-        self.iridiumTxTimeHorizLayout.setObjectName("iridiumTxTimeHorizLayout")
-        self.iridiumTxTimeLabel = QtWidgets.QLabel(parent=self.iridiumFrame)
-        self.iridiumTxTimeLabel.setFont(font12)
-        self.iridiumTxTimeLabel.setObjectName("iridiumTxTimeLabel")
-        self.iridiumTxTimeHorizLayout.addWidget(self.iridiumTxTimeLabel)
-        self.iridiumTxTimeSpinBox = QtWidgets.QSpinBox(parent=self.iridiumFrame)
-        self.iridiumTxTimeSpinBox.setFont(font12)
-        self.iridiumTxTimeSpinBox.setMaximum(60)
-        self.iridiumTxTimeSpinBox.setProperty("value", 5)
-        self.iridiumTxTimeSpinBox.setObjectName("iridiumTxTimeSpinBox")
-        self.iridiumTxTimeHorizLayout.addWidget(self.iridiumTxTimeSpinBox)
-        self.iridiumVertLayout.addLayout(self.iridiumTxTimeHorizLayout)
-        self.iridiumTypeHorizLayoutr = QtWidgets.QHBoxLayout()
-        self.iridiumTypeHorizLayoutr.setObjectName("iridiumTypeHorizLayoutr")
-        self.iridiumTypeComboBox = QtWidgets.QComboBox(parent=self.iridiumFrame)
-        self.iridiumTypeComboBox.setFont(font12)
-        self.iridiumTypeComboBox.setObjectName("iridiumTypeComboBox")
-        self.iridiumTypeHorizLayoutr.addWidget(self.iridiumTypeComboBox)
-        self.iridiumTypeLabel = QtWidgets.QLabel(parent=self.iridiumFrame)
-        self.iridiumTypeLabel.setFont(font12)
-        self.iridiumTypeLabel.setObjectName("iridiumTypeLabel")
-        self.iridiumTypeHorizLayoutr.addWidget(self.iridiumTypeLabel)
-        self.iridiumVertLayout.addLayout(self.iridiumTypeHorizLayoutr)
-        leftColumn.addWidget(self.iridiumFrame)
+        self.iridiumWidget = IridiumConfigWidget(parent=self.centralwidget)
+        leftColumn.addWidget(self.iridiumWidget)
 
-        # ---- GNSS frame (left column) ----
-        self.gnssFrame = styled_frame()
-        self.gnssFrame.setObjectName("gnssFrame")
-        self.gnssVertLayout = QtWidgets.QVBoxLayout(self.gnssFrame)
-        self.gnssVertLayout.setSpacing(4)
-        self.gnssVertLayout.setContentsMargins(4, 4, 4, 4)
-        self.gnssVertLayout.setObjectName("gnssVertLayout")
-        self.gnssSamplesHorizLayout = QtWidgets.QHBoxLayout()
-        self.gnssSamplesHorizLayout.setObjectName("gnssSamplesHorizLayout")
-        self.gnssNumSamplesLabel = QtWidgets.QLabel(parent=self.gnssFrame)
-        self.gnssNumSamplesLabel.setFont(font12)
-        self.gnssNumSamplesLabel.setObjectName("gnssNumSamplesLabel")
-        self.gnssSamplesHorizLayout.addWidget(self.gnssNumSamplesLabel)
-        self.gnssNumSamplesSpinBox = QtWidgets.QSpinBox(parent=self.gnssFrame)
-        self.gnssNumSamplesSpinBox.setFont(font12)
-        self.gnssNumSamplesSpinBox.setMaximum(32768)
-        self.gnssNumSamplesSpinBox.setProperty("value", 4096)
-        self.gnssNumSamplesSpinBox.setObjectName("gnssNumSamplesSpinBox")
-        self.gnssSamplesHorizLayout.addWidget(self.gnssNumSamplesSpinBox)
-        self.gnssVertLayout.addLayout(self.gnssSamplesHorizLayout)
-        self.gnssHighPerformanceModeCheckBox = QtWidgets.QCheckBox(parent=self.gnssFrame)
-        self.gnssHighPerformanceModeCheckBox.setObjectName("gnssHighPerformanceModeCheckBox")
-        self.gnssVertLayout.addWidget(self.gnssHighPerformanceModeCheckBox)
-        self.gnssSampleRateHorizLayout = QtWidgets.QHBoxLayout()
-        self.gnssSampleRateHorizLayout.setObjectName("gnssSampleRateHorizLayout")
-        self.gnssSampleRateComboBox = QtWidgets.QComboBox(parent=self.gnssFrame)
-        self.gnssSampleRateComboBox.setFont(font12)
-        self.gnssSampleRateComboBox.setObjectName("gnssSampleRateComboBox")
-        self.gnssSampleRateHorizLayout.addWidget(self.gnssSampleRateComboBox)
-        self.gnssSampleRateLabel = QtWidgets.QLabel(parent=self.gnssFrame)
-        self.gnssSampleRateLabel.setFont(font12)
-        self.gnssSampleRateLabel.setObjectName("gnssSampleRateLabel")
-        self.gnssSampleRateHorizLayout.addWidget(self.gnssSampleRateLabel)
-        self.gnssVertLayout.addLayout(self.gnssSampleRateHorizLayout)
-        leftColumn.addWidget(self.gnssFrame)
+        self.gnssWidget = GNSSConfigWidget(parent=self.centralwidget)
+        leftColumn.addWidget(self.gnssWidget)
 
         leftColumn.addStretch(1)
 
@@ -632,55 +456,9 @@ class ProgrammerApp(QMainWindow):
         self.graphicsView.setObjectName("graphicsView")
         rightColumn.addWidget(self.graphicsView)
 
-        # ---- Timing frame (right column) ----
-        self.timingFrame = styled_frame()
-        self.timingFrame.setObjectName("timingFrame")
-        self.timingVertLayout = QtWidgets.QVBoxLayout(self.timingFrame)
-        self.timingVertLayout.setSpacing(4)
-        self.timingVertLayout.setContentsMargins(4, 4, 4, 4)
-        self.timingVertLayout.setObjectName("timingVertLayout")
-        self.dutyCycleHorizLayout = QtWidgets.QHBoxLayout()
-        self.dutyCycleHorizLayout.setObjectName("dutyCycleHorizLayout")
-        self.dutyCycleLabel = QtWidgets.QLabel(parent=self.timingFrame)
-        self.dutyCycleLabel.setFont(font12)
-        self.dutyCycleLabel.setObjectName("dutyCycleLabel")
-        self.dutyCycleHorizLayout.addWidget(self.dutyCycleLabel)
-        self.dutyCycleSpinBox = QtWidgets.QSpinBox(parent=self.timingFrame)
-        self.dutyCycleSpinBox.setFont(font12)
-        self.dutyCycleSpinBox.setMaximum(1440)
-        self.dutyCycleSpinBox.setProperty("value", 30)
-        self.dutyCycleSpinBox.setObjectName("dutyCycleSpinBox")
-        self.dutyCycleHorizLayout.addWidget(self.dutyCycleSpinBox)
-        self.timingVertLayout.addLayout(self.dutyCycleHorizLayout)
-        self.gnssBufferTimeHorizLayout = QtWidgets.QHBoxLayout()
-        self.gnssBufferTimeHorizLayout.setObjectName("gnssBufferTimeHorizLayout")
-        self.gnssMaxAcqusitionTimeLabel = QtWidgets.QLabel(parent=self.timingFrame)
-        self.gnssMaxAcqusitionTimeLabel.setFont(font12)
-        self.gnssMaxAcqusitionTimeLabel.setWhatsThis("")
-        self.gnssMaxAcqusitionTimeLabel.setObjectName("gnssMaxAcqusitionTimeLabel")
-        self.gnssBufferTimeHorizLayout.addWidget(self.gnssMaxAcqusitionTimeLabel)
-        self.gnssMaxAcquisitionTimeSpinBox = QtWidgets.QSpinBox(parent=self.timingFrame)
-        self.gnssMaxAcquisitionTimeSpinBox.setFont(font12)
-        self.gnssMaxAcquisitionTimeSpinBox.setWhatsThis("")
-        self.gnssMaxAcquisitionTimeSpinBox.setMaximum(10)
-        self.gnssMaxAcquisitionTimeSpinBox.setProperty("value", 5)
-        self.gnssMaxAcquisitionTimeSpinBox.setObjectName("gnssMaxAcquisitionTimeSpinBox")
-        self.gnssBufferTimeHorizLayout.addWidget(self.gnssMaxAcquisitionTimeSpinBox)
-        self.timingVertLayout.addLayout(self.gnssBufferTimeHorizLayout)
-        self.trackingNumberHorizLayourt = QtWidgets.QHBoxLayout()
-        self.trackingNumberHorizLayourt.setObjectName("trackingNumberHorizLayourt")
-        self.trackingNumberLabel = QtWidgets.QLabel(parent=self.timingFrame)
-        self.trackingNumberLabel.setFont(font12)
-        self.trackingNumberLabel.setObjectName("trackingNumberLabel")
-        self.trackingNumberHorizLayourt.addWidget(self.trackingNumberLabel)
-        self.trackingNumberSpinBox = QtWidgets.QSpinBox(parent=self.timingFrame)
-        self.trackingNumberSpinBox.setFont(font12)
-        self.trackingNumberSpinBox.setMaximum(1000)
-        self.trackingNumberSpinBox.setProperty("value", 100)
-        self.trackingNumberSpinBox.setObjectName("trackingNumberSpinBox")
-        self.trackingNumberHorizLayourt.addWidget(self.trackingNumberSpinBox)
-        self.timingVertLayout.addLayout(self.trackingNumberHorizLayourt)
-        rightColumn.addWidget(self.timingFrame)
+        # ---- Timing widget (right column) ----
+        self.timingWidget = TimingConfigWidget(parent=self.centralwidget)
+        rightColumn.addWidget(self.timingWidget)
 
         # --- ST-LINK device selection frame (right column) ---
         self.stlinkFrame = styled_frame()
@@ -785,54 +563,33 @@ class ProgrammerApp(QMainWindow):
                                           QtWidgets.QSizePolicy.Policy.Expanding)
         mainLayout.addWidget(self.statusTextEdit, stretch=1)
 
-        # ---- Config frames list (used for bulk enable/disable) ----
-        self._config_frames = [
-            self.ctFrame, self.lightFrame, self.accelerometerFrame,
-            self.turbidityFrame, self.iridiumFrame, self.gnssFrame,
-            self.timingFrame,
+        # ---- Config widgets list (used for bulk enable/disable) ----
+        self._config_widgets = [
+            self.ctWidget, self.lightWidget, self.accelWidget,
+            self.turbidityWidget, self.iridiumWidget, self.gnssWidget,
+            self.timingWidget,
         ]
 
         self.setCentralWidget(self.centralwidget)
 
-        self.retranslateUi(self)
-        QtCore.QMetaObject.connectSlotsByName(self)
-
+        self._setWidgetLabels()
         self.finishSetup()
 
-    def retranslateUi(self, MainWindow):
-        _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "microSWIFT Configurator Version "
-                                                           "{major}.{minor}".format(major=PROGRAMMER_MAJOR_VERSION,
-                                                                                    minor=PROGRAMMER_MINOR_VERSION)))
-        self.ctEnableButton.setText(_translate("MainWindow", "Enable CT"))
-        self.tempEnableButton.setText(_translate("MainWindow", "Enable Temperature"))
-        self.lightEnableButton.setText(_translate("MainWindow", "Enable Light"))
-        self.lightMatchGNSSCheckbox.setText(_translate("MainWindow", "Match GNSS period"))
-        self.lightGainLabel.setText(_translate("MainWindow", "Gain"))
-        self.lightNumSamplesLabel.setText(_translate("MainWindow", "Number of samples @ 0.5Hz"))
-        self.iridiumTxTimeLabel.setText(_translate("MainWindow", "Iridium transmit time in mins"))
-        self.iridiumTypeLabel.setText(_translate("MainWindow", "Iridium Modem Type"))
-        self.gnssNumSamplesLabel.setText(_translate("MainWindow", "Number of GNSS samples"))
-        self.gnssHighPerformanceModeCheckBox.setText(_translate("MainWindow", "Enable GNSS high performance mode"))
-        self.gnssSampleRateLabel.setText(_translate("MainWindow", "GNSS Sampling Rate"))
-        self.dutyCycleLabel.setText(_translate("MainWindow", "Total Duty Cycle (mins)"))
-        self.gnssMaxAcqusitionTimeLabel.setText(_translate("MainWindow", "GNSS max time to fix (mins)"))
-        self.trackingNumberLabel.setText(_translate("MainWindow", "microSWIFT Tracking number"))
-        self.stlinkLabel.setText(_translate("MainWindow", "Available ST-LINKs:"))
-        self.stlinkRefreshButton.setText(_translate("MainWindow", "Refresh"))
-        self.verifyButton.setText(_translate("MainWindow", "Verify"))
-        self.programButton.setText(_translate("MainWindow", "Program"))
-        self.downloadConfigFile.setText(_translate("MainWindow", "Download Config"))
-        self.accelerometerEnableButton.setText(_translate("MainWindow", "Enable Accelerometer"))
-        self.turbidityEnableButton.setText(_translate("MainWindow", "Enable Turbidity"))
-        self.turbidityMatchGNSSCheckbox.setText(_translate("MainWindow", "Match GNSS period"))
-        self.turbiditySerialNumberLabel.setText(_translate("MainWindow", "Serial Number"))
-        self.turbidityNumSamplesLabel.setText(_translate("MainWindow", "Number of samples @ 1Hz"))
-        self.firmwareLabel.setText(_translate("MainWindow", "Available Firmware:"))
-        self.firmwareRefreshButton.setText(_translate("MainWindow", "Refresh"))
-        self.firmwareUrlLabel.setText(_translate("MainWindow", "Firmware URL:"))
-        self.useUrlButton.setText(_translate("MainWindow", "Download"))
-        self.resetUrlButton.setText(_translate("MainWindow", "Reset to default"))
+    def _setWidgetLabels(self):
+        """Set text labels for non-config UI elements."""
+        self.setWindowTitle("microSWIFT Configurator Version "
+                            "{major}.{minor}".format(major=PROGRAMMER_MAJOR_VERSION,
+                                                     minor=PROGRAMMER_MINOR_VERSION))
+        self.stlinkLabel.setText("Available ST-LINKs:")
+        self.stlinkRefreshButton.setText("Refresh")
+        self.verifyButton.setText("Verify")
+        self.programButton.setText("Program")
+        self.downloadConfigFile.setText("Download Config")
+        self.firmwareLabel.setText("Available Firmware:")
+        self.firmwareRefreshButton.setText("Refresh")
+        self.firmwareUrlLabel.setText("Firmware URL:")
+        self.useUrlButton.setText("Download")
+        self.resetUrlButton.setText("Reset to default")
 
     def adjust_font_color_based_on_background(self, text_edit: QTextEdit):
         """Adjusts font color in a QTextEdit based on background color."""
@@ -866,19 +623,14 @@ class ProgrammerApp(QMainWindow):
         text_edit.mergeCurrentCharFormat(format)
 
     def finishSetup(self):
-        # Added functionality
         self.worker = Worker()
         self.thread = QThread()
         self.worker.moveToThread(self.thread)
         self.scene = QGraphicsScene()
 
-        self.disableAllOptionalSensors()
         self.connectUIElements()
-        self.fillComboBoxes()
         self.find_usb_port()
         self.displayPicture()
-
-        self.lightGainComboBox.setCurrentIndex(2)
 
         self.loadSettings()
 
@@ -947,9 +699,7 @@ class ProgrammerApp(QMainWindow):
 
 
     def assembleBinaryConfigStruct(self):
-        get_int_from_str = lambda s: int(re.search(r'\d+', s).group()) if re.search(r'\d+', s) else None
         '''
-
                     Definition of configuration struct from configuration.h in firmware files
 
                     typedef struct __attribute__((packed)) microSWIFT_configuration
@@ -976,129 +726,57 @@ class ProgrammerApp(QMainWindow):
                       const char compile_date_flash[11];
                       const char compile_time_flash[9];
                     } microSWIFT_configuration;
-
-                    In microSWIFT.ld:
-
-                      /* Custom variables (firmware version, compile date/time, etc) */
-                      .uservars :
-                      {
-                        /* Variables contained in type microSWIFT_configuration contained in configuration.h */
-                        KEEP(*(.uservars.CONFIGURATION))
-                        *(.uservars*);
-                      } > USERVARS
                     '''
+        ct = self.ctWidget.get_config()
+        light = self.lightWidget.get_config()
+        accel = self.accelWidget.get_config()
+        turbidity = self.turbidityWidget.get_config()
+        iridium = self.iridiumWidget.get_config()
+        gnss = self.gnssWidget.get_config()
+        timing = self.timingWidget.get_config()
 
         current_datetime = datetime.now()
+        date = current_datetime.strftime("%m/%d/%Y") + "\x00"
+        time = current_datetime.strftime("%H:%M:%S") + "\x00"
 
-        # Format the date and time strings
-        date = current_datetime.strftime("%m/%d/%Y")  # MM/DD/YYYY
-        time = current_datetime.strftime("%H:%M:%S")  # HH:MM:SS
-        date += "\x00"  # null terminated
-        time += "\x00"  # null terminated
-
-        v3f = self.iridiumTypeComboBox.currentText() == "V3F"
-
-        configStruct = struct.pack("<LLLLLLLLLH???????11s9s",
-                                   int(self.trackingNumberSpinBox.value()),
-                                   int(self.gnssNumSamplesSpinBox.value()),
-                                   int(self.dutyCycleSpinBox.value()),
-                                   int(self.iridiumTxTimeSpinBox.value()),
-                                   int(self.gnssMaxAcquisitionTimeSpinBox.value()),
-                                   get_int_from_str(self.gnssSampleRateComboBox.currentText()),
-                                   int(self.lightNumSamplesSpinBox.value()),
-                                   int(self.lightGainComboBox.currentIndex()),
-                                   int(self.turbidityNumSamplesSpinBox.value()),
-                                   int(self.turbiditySerialNumberSpinBox.value()),
-                                   bool(self.iridiumTypeComboBox.currentText() == "V3F"),
-                                   bool(self.gnssHighPerformanceModeCheckBox.isChecked()),
-                                   bool(self.ctEnableButton.isChecked()),
-                                   bool(self.tempEnableButton.isChecked()),
-                                   bool(self.lightEnableButton.isChecked()),
-                                   bool(self.turbidityEnableButton.isChecked()),
-                                   bool(self.accelerometerEnableButton.isChecked()),
-                                   bytes(date.encode("utf-8")),
-                                   bytes(time.encode("utf-8"))
-                                   )
-
-        num_bytes = len(configStruct)
-
-        return configStruct
+        return struct.pack("<LLLLLLLLLH???????11s9s",
+                           timing.tracking_number,
+                           gnss.num_samples,
+                           timing.duty_cycle,
+                           iridium.tx_time,
+                           timing.gnss_max_acquisition_time,
+                           gnss.sample_rate,
+                           light.num_samples,
+                           light.gain_index,
+                           turbidity.num_samples,
+                           turbidity.serial_number,
+                           iridium.v3f,
+                           gnss.high_performance_mode,
+                           ct.ct_enabled,
+                           ct.temperature_enabled,
+                           light.enabled,
+                           turbidity.enabled,
+                           accel,
+                           bytes(date.encode("utf-8")),
+                           bytes(time.encode("utf-8")),
+                           )
     def assembleBinaryConfigFile(self):
         with open(self.configFilePath, "wb") as configFile:
             configFile.write(self.assembleBinaryConfigStruct())
 
     def saveSettings(self):
         settings = QSettings("SASlabgroup", "microSWIFT_Programmer")
-        # Radio buttons
-        settings.setValue("ctEnabled", self.ctEnableButton.isChecked())
-        settings.setValue("tempEnabled", self.tempEnableButton.isChecked())
-        settings.setValue("lightEnabled", self.lightEnableButton.isChecked())
-        settings.setValue("accelerometerEnabled", self.accelerometerEnableButton.isChecked())
-        settings.setValue("turbidityEnabled", self.turbidityEnableButton.isChecked())
-        # Checkboxes
-        settings.setValue("lightMatchGNSS", self.lightMatchGNSSCheckbox.isChecked())
-        settings.setValue("turbidityMatchGNSS", self.turbidityMatchGNSSCheckbox.isChecked())
-        settings.setValue("gnssHighPerformanceMode", self.gnssHighPerformanceModeCheckBox.isChecked())
-        # Spin boxes
-        settings.setValue("lightNumSamples", self.lightNumSamplesSpinBox.value())
-        settings.setValue("turbiditySerialNumber", self.turbiditySerialNumberSpinBox.value())
-        settings.setValue("turbidityNumSamples", self.turbidityNumSamplesSpinBox.value())
-        settings.setValue("iridiumTxTime", self.iridiumTxTimeSpinBox.value())
-        settings.setValue("gnssNumSamples", self.gnssNumSamplesSpinBox.value())
-        settings.setValue("dutyCycle", self.dutyCycleSpinBox.value())
-        settings.setValue("gnssMaxAcquisitionTime", self.gnssMaxAcquisitionTimeSpinBox.value())
-        settings.setValue("trackingNumber", self.trackingNumberSpinBox.value())
-        # Combo boxes
-        settings.setValue("lightGainIndex", self.lightGainComboBox.currentIndex())
-        settings.setValue("iridiumTypeIndex", self.iridiumTypeComboBox.currentIndex())
-        settings.setValue("gnssSampleRateIndex", self.gnssSampleRateComboBox.currentIndex())
-        # ST-LINK (save serial number, not combo box position)
+        for w in self._config_widgets:
+            w.save_settings(settings)
         settings.setValue("stlinkSerial", self.stlink_serial)
-        # Firmware URL
         settings.setValue("firmwareUrl", self.firmwareUrlLineEdit.text())
 
     def loadSettings(self):
         settings = QSettings("SASlabgroup", "microSWIFT_Programmer")
-        # Only restore if settings have been saved before
         if not settings.contains("trackingNumber"):
             return
-        # Spin boxes
-        self.lightNumSamplesSpinBox.setValue(int(settings.value("lightNumSamples", 512)))
-        self.turbiditySerialNumberSpinBox.setValue(int(settings.value("turbiditySerialNumber", 0)))
-        self.turbidityNumSamplesSpinBox.setValue(int(settings.value("turbidityNumSamples", 1024)))
-        self.iridiumTxTimeSpinBox.setValue(int(settings.value("iridiumTxTime", 5)))
-        self.gnssNumSamplesSpinBox.setValue(int(settings.value("gnssNumSamples", 4096)))
-        self.dutyCycleSpinBox.setValue(int(settings.value("dutyCycle", 30)))
-        self.gnssMaxAcquisitionTimeSpinBox.setValue(int(settings.value("gnssMaxAcquisitionTime", 5)))
-        self.trackingNumberSpinBox.setValue(int(settings.value("trackingNumber", 100)))
-        # Combo boxes
-        self.lightGainComboBox.setCurrentIndex(int(settings.value("lightGainIndex", 2)))
-        self.iridiumTypeComboBox.setCurrentIndex(int(settings.value("iridiumTypeIndex", 0)))
-        self.gnssSampleRateComboBox.setCurrentIndex(int(settings.value("gnssSampleRateIndex", 0)))
-        # Checkboxes
-        self.lightMatchGNSSCheckbox.setChecked(settings.value("lightMatchGNSS", False) == True
-                                               or settings.value("lightMatchGNSS", False) == "true")
-        self.turbidityMatchGNSSCheckbox.setChecked(settings.value("turbidityMatchGNSS", False) == True
-                                                   or settings.value("turbidityMatchGNSS", False) == "true")
-        self.gnssHighPerformanceModeCheckBox.setChecked(settings.value("gnssHighPerformanceMode", False) == True
-                                                        or settings.value("gnssHighPerformanceMode", False) == "true")
-        # Radio buttons — set checked state, then trigger handlers to enable/disable dependent widgets
-        self.ctEnableButton.setChecked(settings.value("ctEnabled", False) == True
-                                       or settings.value("ctEnabled", False) == "true")
-        self.tempEnableButton.setChecked(settings.value("tempEnabled", False) == True
-                                         or settings.value("tempEnabled", False) == "true")
-        self.lightEnableButton.setChecked(settings.value("lightEnabled", False) == True
-                                          or settings.value("lightEnabled", False) == "true")
-        self.accelerometerEnableButton.setChecked(settings.value("accelerometerEnabled", False) == True
-                                                  or settings.value("accelerometerEnabled", False) == "true")
-        self.turbidityEnableButton.setChecked(settings.value("turbidityEnabled", False) == True
-                                              or settings.value("turbidityEnabled", False) == "true")
-        # Trigger enable/disable logic for dependent widgets
-        self.onCtEnabledClick()
-        self.onTempEnabledClick()
-        self.onLightEnabledClick()
-        self.onAccelerometerEnabledClick()
-        self.onTurbidityEnabledClick()
+        for w in self._config_widgets:
+            w.load_settings(settings)
         # ST-LINK — select by serial number if the device is currently connected
         saved_serial = settings.value("stlinkSerial", "")
         if saved_serial and self.stlink_devices:
@@ -1111,37 +789,6 @@ class ProgrammerApp(QMainWindow):
         if url:
             self.firmwareUrlLineEdit.setText(url)
 
-    def fillComboBoxes(self):
-        # Iridium type drop box
-        self.iridiumTypeComboBox.addItem("V3D")
-        self.iridiumTypeComboBox.addItem("V3F")
-
-        # GNSS sampling ratre drop box
-        self.gnssSampleRateComboBox.addItem("4 Hz")
-        self.gnssSampleRateComboBox.addItem("5 Hz")
-
-        self.lightGainComboBox.addItem("0.5x")
-        self.lightGainComboBox.addItem("1x")
-        self.lightGainComboBox.addItem("2x")
-        self.lightGainComboBox.addItem("4x")
-        self.lightGainComboBox.addItem("8x")
-        self.lightGainComboBox.addItem("16x")
-        self.lightGainComboBox.addItem("32x")
-        self.lightGainComboBox.addItem("64x")
-        self.lightGainComboBox.addItem("128x")
-        self.lightGainComboBox.addItem("256x")
-        self.lightGainComboBox.addItem("512x")
-
-    def disableAllOptionalSensors(self):
-        self.lightNumSamplesLabel.setDisabled(True)
-        self.lightNumSamplesSpinBox.setDisabled(True)
-
-        self.turbidityNumSamplesLabel.setDisabled(True)
-        self.turbidityNumSamplesSpinBox.setDisabled(True)
-
-        self.programButton.setDisabled(True)
-        self.downloadConfigFile.setDisabled(True)
-
     def connectUIElements(self):
         self.worker.stdoutAvailable.connect(self.appendText)
         self.worker.stderrAvailable.connect(self.appendError)
@@ -1149,14 +796,14 @@ class ProgrammerApp(QMainWindow):
         self.worker.finished.connect(self.reenableGUI)
         self.worker.finished.connect(self.threadFinished)
 
-        self.ctEnableButton.clicked.connect(self.onCtEnabledClick)
-        self.tempEnableButton.clicked.connect(self.onTempEnabledClick)
-        self.lightEnableButton.clicked.connect(self.onLightEnabledClick)
-        self.accelerometerEnableButton.clicked.connect(self.onAccelerometerEnabledClick)
-        self.turbidityEnableButton.clicked.connect(self.onTurbidityEnabledClick)
-        self.lightMatchGNSSCheckbox.clicked.connect(self.onLightMatchGnssClicked)
-        self.turbidityMatchGNSSCheckbox.clicked.connect(self.onTurbidityMatchGnssClicked)
+        # Config widget signals → reset verify on any change
+        for w in self._config_widgets:
+            w.configChanged.connect(self.resetVerifyButton)
 
+        # GNSS → Light/Turbidity cross-widget coordination
+        self.gnssWidget.configChanged.connect(self._syncGNSSToSensors)
+
+        # Non-config UI connections
         self.stlinkComboBox.currentIndexChanged.connect(self.onStlinkSelected)
         self.stlinkRefreshButton.clicked.connect(self.find_usb_port)
 
@@ -1167,95 +814,18 @@ class ProgrammerApp(QMainWindow):
         self.programButton.clicked.connect(self.programDevice)
         self.downloadConfigFile.clicked.connect(self.saveConfigAsFile)
 
-        # Firmware URL buttons
         self.useUrlButton.clicked.connect(self.onUseUrlClicked)
         self.resetUrlButton.clicked.connect(self.onResetUrlClicked)
         self.firmwareUrlLineEdit.returnPressed.connect(self.onUseUrlClicked)
 
-        self.lightNumSamplesSpinBox.valueChanged.connect(self.resetVerifyButton)
-        self.lightGainComboBox.currentIndexChanged.connect(self.resetVerifyButton)
-        self.turbidityNumSamplesSpinBox.valueChanged.connect(self.resetVerifyButton)
-        self.iridiumTxTimeSpinBox.valueChanged.connect(self.resetVerifyButton)
-        self.gnssNumSamplesSpinBox.valueChanged.connect(self.resetVerifyButton)
-        self.gnssNumSamplesSpinBox.valueChanged.connect(self.onLightMatchGnssClicked)
-        self.gnssNumSamplesSpinBox.valueChanged.connect(self.onTurbidityMatchGnssClicked)
-        self.gnssSampleRateComboBox.currentIndexChanged.connect(self.onLightMatchGnssClicked)
-        self.gnssSampleRateComboBox.currentIndexChanged.connect(self.onTurbidityMatchGnssClicked)
-        self.dutyCycleSpinBox.valueChanged.connect(self.resetVerifyButton)
-        self.gnssMaxAcquisitionTimeSpinBox.valueChanged.connect(self.resetVerifyButton)
-        self.trackingNumberSpinBox.valueChanged.connect(self.resetVerifyButton)
+        self.programButton.setDisabled(True)
+        self.downloadConfigFile.setDisabled(True)
 
-        self.iridiumTypeComboBox.currentIndexChanged.connect(self.resetVerifyButton)
-        self.gnssSampleRateComboBox.currentIndexChanged.connect(self.resetVerifyButton)
-
-    def onCtEnabledClick(self):
-        if self.ctEnableButton.isChecked():
-            self.tempEnableButton.setChecked(False)
-
-        self.resetVerifyButton()
-
-    def onTempEnabledClick(self):
-        if self.tempEnableButton.isChecked():
-            self.ctEnableButton.setChecked(False)
-
-        self.resetVerifyButton()
-
-    def onLightEnabledClick(self):
-        if self.lightEnableButton.isChecked():
-            self.lightNumSamplesLabel.setEnabled(True)
-            self.lightNumSamplesSpinBox.setEnabled(True)
-            self.lightMatchGNSSCheckbox.setEnabled(True)
-            self.lightGainLabel.setEnabled(True)
-            self.lightGainComboBox.setEnabled(True)
-        else:
-            self.lightNumSamplesLabel.setDisabled(True)
-            self.lightNumSamplesSpinBox.setDisabled(True)
-            self.lightMatchGNSSCheckbox.setDisabled(True)
-            self.lightGainLabel.setDisabled(True)
-            self.lightGainComboBox.setDisabled(True)
-
-        self.resetVerifyButton()
-
-    def onLightMatchGnssClicked(self):
-        get_int_from_str = lambda s: int(re.search(r'\d+', s).group()) if re.search(r'\d+', s) else None
-        if self.lightMatchGNSSCheckbox.isChecked():
-            self.lightNumSamplesSpinBox.setDisabled(True)
-            self.lightNumSamplesSpinBox.setValue(int((self.gnssNumSamplesSpinBox.value() /
-                                                      get_int_from_str(self.gnssSampleRateComboBox.currentText()) / 2)))
-        elif self.lightEnableButton.isChecked():
-            self.lightNumSamplesSpinBox.setEnabled(True)
-
-        self.resetVerifyButton()
-
-    def onAccelerometerEnabledClick(self):
-        self.resetVerifyButton()
-
-    def onTurbidityEnabledClick(self):
-        if self.turbidityEnableButton.isChecked():
-            self.turbidityNumSamplesLabel.setEnabled(True)
-            self.turbidityNumSamplesSpinBox.setEnabled(True)
-            self.turbidityMatchGNSSCheckbox.setEnabled(True)
-            self.turbiditySerialNumberLabel.setEnabled(True)
-            self.turbiditySerialNumberSpinBox.setEnabled(True)
-        else:
-            self.turbidityNumSamplesLabel.setDisabled(True)
-            self.turbidityNumSamplesSpinBox.setDisabled(True)
-            self.turbidityMatchGNSSCheckbox.setDisabled(True)
-            self.turbiditySerialNumberLabel.setDisabled(True)
-            self.turbiditySerialNumberSpinBox.setDisabled(True)
-
-        self.resetVerifyButton()
-
-    def onTurbidityMatchGnssClicked(self):
-        get_int_from_str = lambda s: int(re.search(r'\d+', s).group()) if re.search(r'\d+', s) else None
-        if self.turbidityMatchGNSSCheckbox.isChecked():
-            self.turbidityNumSamplesSpinBox.setDisabled(True)
-            self.turbidityNumSamplesSpinBox.setValue(int(self.gnssNumSamplesSpinBox.value() /
-                                                         get_int_from_str(self.gnssSampleRateComboBox.currentText())))
-        elif self.turbidityEnableButton.isChecked():
-            self.turbidityNumSamplesSpinBox.setEnabled(True)
-
-        self.resetVerifyButton()
+    def _syncGNSSToSensors(self):
+        """Forward GNSS parameters to Light and Turbidity widgets for match-GNSS calculation."""
+        gnss = self.gnssWidget.get_config()
+        self.lightWidget.set_gnss_params(gnss.num_samples, gnss.sample_rate)
+        self.turbidityWidget.set_gnss_params(gnss.num_samples, gnss.sample_rate)
 
     def find_usb_port(self):
         """Scan for all ST-LINK devices and populate the dropdown."""
@@ -1380,18 +950,19 @@ class ProgrammerApp(QMainWindow):
             self.programButton.setDisabled(True)
 
     def _setConfigEnabled(self, enabled):
-        """Enable or disable all configuration-related frames.
+        """Enable or disable all configuration-related widgets.
 
-        When disabled, config frames are greyed out, Verify and Download Config
-        buttons are hidden, and Program is directly enabled (no verify needed).
+        When re-enabling, each widget's set_config_enabled restores the correct
+        internal state (e.g. Light sub-controls stay disabled if Light is off).
         """
         self._config_needed = enabled
 
-        for frame in self._config_frames:
-            frame.setEnabled(enabled)
+        for w in self._config_widgets:
+            w.set_config_enabled(enabled)
 
         if enabled:
             self.verifyButton.setVisible(True)
+            self.verifyButton.setEnabled(True)
             self.downloadConfigFile.setVisible(True)
             self.resetVerifyButton()
         else:
@@ -1424,66 +995,51 @@ class ProgrammerApp(QMainWindow):
         self.stlink_serial = dev['serial']
 
     def verifySettings(self):
-        # For getting GNSS sample rate from drop down box
-        get_int_from_str = lambda s: int(re.search(r'\d+', s).group()) if re.search(r'\d+', s) else None
+        light = self.lightWidget.get_config()
+        turbidity = self.turbidityWidget.get_config()
+        iridium = self.iridiumWidget.get_config()
+        gnss = self.gnssWidget.get_config()
+        timing = self.timingWidget.get_config()
 
         settings_invalid = False
         verify_strings = []
 
-        # Pull all the values from the UI
-        light_enabled = self.lightEnableButton.isChecked()
-        light_num_samples = self.lightNumSamplesSpinBox.value()
-        turbidity_enabled = self.turbidityEnableButton.isChecked()
-        turbidity_num_samples = self.turbidityNumSamplesSpinBox.value()
-        iridium_tx_time = self.iridiumTxTimeSpinBox.value()
-        num_gnss_samples = self.gnssNumSamplesSpinBox.value()
-        gnss_sample_rate = get_int_from_str(self.gnssSampleRateComboBox.currentText())
-        duty_cycle = self.dutyCycleSpinBox.value()
-        gnss_window_buffer = self.gnssMaxAcquisitionTimeSpinBox.value()
+        gnss_duration = (((gnss.num_samples / gnss.sample_rate) / 60) + 1) + timing.gnss_max_acquisition_time
 
-        gnss_duration = (((num_gnss_samples / gnss_sample_rate) / 60) + 1) + gnss_window_buffer
-
-        if (duty_cycle - gnss_duration - iridium_tx_time) < 0:
+        if (timing.duty_cycle - gnss_duration - iridium.tx_time) < 0:
             verify_strings.append("Duty cycle not long enough to complete GNSS sample window.\n")
             settings_invalid = True
 
-        if light_enabled:
-            if ((duty_cycle - ((light_num_samples / 30) + 1) - iridium_tx_time) < 0):
+        if light.enabled:
+            if ((timing.duty_cycle - ((light.num_samples / 30) + 1) - iridium.tx_time) < 0):
                 verify_strings.append("Duty cycle not long enough to complete Light sample window.\n")
                 settings_invalid = True
-            if (int((self.gnssNumSamplesSpinBox.value() / get_int_from_str(self.gnssSampleRateComboBox.currentText())
-                     / 2)) > 1800):
+            if int(gnss.num_samples / gnss.sample_rate / 2) > 1800:
                 verify_strings.append("Max number of light samples is 1800.\n")
                 settings_invalid = True
 
-        if turbidity_enabled:
-            if ((duty_cycle - ((turbidity_num_samples / 60) + 1) - iridium_tx_time) < 0):
+        if turbidity.enabled:
+            if ((timing.duty_cycle - ((turbidity.num_samples / 60) + 1) - iridium.tx_time) < 0):
                 verify_strings.append("Duty cycle not long enough to complete Turbidity sample window.\n")
                 settings_invalid = True
-            if (int(self.gnssNumSamplesSpinBox.value() / get_int_from_str(self.gnssSampleRateComboBox.currentText()))
-                    > 3600):
+            if int(gnss.num_samples / gnss.sample_rate) > 3600:
                 verify_strings.append("Max number of turbidity samples is 3600.\n")
                 settings_invalid = True
 
         if settings_invalid:
             self.programButton.setDisabled(True)
             self.downloadConfigFile.setDisabled(True)
-            # Use a more subtle approach with text instead of background colors
             self.verifyButton.setText("❌ Verify - Settings Invalid")
             self.verifyButton.setStyleSheet("font-size: 16px; font-weight: bold;")
-
-            write_string = "".join(verify_strings)
-
-            self.writeError(write_string)
+            self.writeError("".join(verify_strings))
         else:
             self.programButton.setEnabled(True)
             self.downloadConfigFile.setEnabled(True)
-            # Use a more subtle approach with text instead of background colors
             self.verifyButton.setText("✅ Verify - Settings Valid")
             self.verifyButton.setStyleSheet("font-size: 16px; font-weight: bold;")
             self.writeText("Settings verified. You did a great job.")
 
-    def resetVerifyButton(self):
+    def resetVerifyButton(self, clear_status=True):
         if not self._config_needed:
             # No config means no verify step; Program stays directly enabled
             return
@@ -1492,7 +1048,8 @@ class ProgrammerApp(QMainWindow):
         # Reset button text to default
         self.verifyButton.setText("Verify")
         self.verifyButton.setStyleSheet("font-size: 16px;")
-        self.writeText("Configure as desired and press the Verify button when ready.")
+        if clear_status:
+            self.writeText("Configure as desired and press the Verify button when ready.")
 
     def writeError(self, err_str):
         self.statusTextEdit.clear()
@@ -1637,29 +1194,13 @@ class ProgrammerApp(QMainWindow):
         self.thread.start()
 
     def disableGUI(self):
-        self.ctEnableButton.setDisabled(True)
-        self.tempEnableButton.setDisabled(True)
-        self.lightEnableButton.setDisabled(True)
-        self.lightMatchGNSSCheckbox.setDisabled(True)
-        self.lightNumSamplesSpinBox.setDisabled(True)
-        self.accelerometerEnableButton.setDisabled(True)
-        self.turbidityEnableButton.setDisabled(True)
-        self.turbidityMatchGNSSCheckbox.setDisabled(True)
-        self.turbidityNumSamplesSpinBox.setDisabled(True)
-        self.iridiumTxTimeSpinBox.setDisabled(True)
-        self.iridiumTypeComboBox.setDisabled(True)
-        self.gnssNumSamplesSpinBox.setDisabled(True)
-        self.gnssHighPerformanceModeCheckBox.setDisabled(True)
-        self.gnssSampleRateComboBox.setDisabled(True)
-        self.dutyCycleSpinBox.setDisabled(True)
-        self.gnssMaxAcquisitionTimeSpinBox.setDisabled(True)
-        self.trackingNumberSpinBox.setDisabled(True)
+        for w in self._config_widgets:
+            w.setEnabled(False)
         self.stlinkComboBox.setDisabled(True)
         self.stlinkRefreshButton.setDisabled(True)
         self.verifyButton.setDisabled(True)
         self.programButton.setDisabled(True)
         self.downloadConfigFile.setDisabled(True)
-        # Lock firmware and URL controls while flashing
         self.firmwareComboBox.setDisabled(True)
         self.firmwareRefreshButton.setDisabled(True)
         self.firmwareUrlLineEdit.setDisabled(True)
@@ -1667,20 +1208,15 @@ class ProgrammerApp(QMainWindow):
         self.resetUrlButton.setDisabled(True)
 
     def reenableGUI(self):
-        # Re-enable config frames only if firmware needs config
         if self._config_needed:
-            for frame in self._config_frames:
-                frame.setEnabled(True)
-            # Re-apply per-sensor enable/disable state
-            self.onLightEnabledClick()
-            self.onTurbidityEnabledClick()
+            for w in self._config_widgets:
+                w.set_config_enabled(True)
             self.verifyButton.setEnabled(True)
             self.downloadConfigFile.setEnabled(True)
-            self.resetVerifyButton()
+            self.resetVerifyButton(clear_status=False)
         else:
             self.programButton.setEnabled(True)
 
-        # Always re-enable non-config controls
         self.stlinkComboBox.setEnabled(True)
         self.stlinkRefreshButton.setEnabled(True)
         self.firmwareComboBox.setEnabled(True)
