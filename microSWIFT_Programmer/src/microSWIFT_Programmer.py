@@ -966,7 +966,7 @@ class ProgrammerApp(QMainWindow):
             self.verifyButton.setVisible(True)
             self.verifyButton.setEnabled(True)
             self.downloadConfigFile.setVisible(True)
-            self.resetVerifyButton()
+            self.resetVerifyButton(False)
         else:
             self.verifyButton.setVisible(False)
             self.downloadConfigFile.setVisible(False)
@@ -1041,7 +1041,7 @@ class ProgrammerApp(QMainWindow):
             self.verifyButton.setStyleSheet("font-size: 16px; font-weight: bold;")
             self.writeText("Settings verified. You did a great job.")
 
-    def resetVerifyButton(self, clear_status=True):
+    def resetVerifyButton(self, clear_status=False):
         if not self._config_needed:
             # No config means no verify step; Program stays directly enabled
             return
@@ -1135,7 +1135,7 @@ class ProgrammerApp(QMainWindow):
             self.appendText("Firmware downloaded to: {p}".format(p=path))
             self.updateActiveFirmwareDisplay()
             # Require re-verification since the firmware changed
-            self.resetVerifyButton()
+            self.resetVerifyButton(False)
         else:
             self.appendError("Download failed: {e}".format(e=error))
             QtWidgets.QMessageBox.critical(
