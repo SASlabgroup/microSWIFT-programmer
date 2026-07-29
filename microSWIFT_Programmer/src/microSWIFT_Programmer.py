@@ -26,7 +26,7 @@ from config_widgets import (
 )
 
 PROGRAMMER_MAJOR_VERSION = 1
-PROGRAMMER_MINOR_VERSION = 4
+PROGRAMMER_MINOR_VERSION = 5
 
 
 def get_resource_path(relative_path):
@@ -700,33 +700,34 @@ class ProgrammerApp(QMainWindow):
 
     def assembleBinaryConfigStruct(self):
         '''
-                    Definition of configuration struct from configuration.h in firmware files
+        Definition of configuration struct from configuration.h in firmware files
 
-                    typedef struct __attribute__((packed)) microSWIFT_configuration
-                    {
-                      uint32_t tracking_number;
-                      uint32_t gnss_samples_per_window;
-                      uint32_t duty_cycle;
-                      uint32_t iridium_max_transmit_time;
-                      uint32_t gnss_max_acquisition_wait_time;
-                      uint32_t gnss_sampling_rate;
-                      uint32_t total_light_samples;
-                      uint32_t light_sensor_gain;
-                      uint32_t total_turbidity_samples;
-                      uint16_t turbidity_serial_number;
+        typedef struct __attribute__((packed)) microSWIFT_configuration
+        {
+            uint32_t tracking_number;
+            uint32_t gnss_samples_per_window;
+            uint32_t duty_cycle;
+            uint32_t iridium_max_transmit_time;
+            uint32_t gnss_max_acquisition_wait_time;
+            uint32_t gnss_sampling_rate;
+            uint32_t total_light_samples;
+            uint32_t light_sensor_gain;
+            uint32_t total_turbidity_samples;
+            uint16_t turbidity_serial_number;
 
-                      bool iridium_v3f;
-                      bool gnss_high_performance_mode;
-                      bool ct_enabled;
-                      bool temperature_enabled;
-                      bool light_enabled;
-                      bool turbidity_enabled;
-                      bool accelerometer_enabled;
+            bool iridium_v3f;
+            bool gnss_high_performance_mode;
+            bool ct_enabled;
+            bool temperature_enabled;
+            bool light_enabled;
+            bool turbidity_enabled;
+            bool accelerometer_enabled;
+            bool accelerometer_continuous_sampling;
 
-                      const char compile_date_flash[11];
-                      const char compile_time_flash[9];
-                    } microSWIFT_configuration;
-                    '''
+            const char compile_date_flash[11];
+            const char compile_time_flash[9];
+        } microSWIFT_configuration;
+        '''
         ct = self.ctWidget.get_config()
         light = self.lightWidget.get_config()
         accel = self.accelWidget.get_config()
@@ -739,7 +740,7 @@ class ProgrammerApp(QMainWindow):
         date = current_datetime.strftime("%m/%d/%Y") + "\x00"
         time = current_datetime.strftime("%H:%M:%S") + "\x00"
 
-        return struct.pack("<LLLLLLLLLH???????11s9s",
+        return struct.pack("<LLLLLLLLLH????????11s9s",
                            timing.tracking_number,
                            gnss.num_samples,
                            timing.duty_cycle,
@@ -756,7 +757,8 @@ class ProgrammerApp(QMainWindow):
                            ct.temperature_enabled,
                            light.enabled,
                            turbidity.enabled,
-                           accel,
+                           accel.enabled,
+                           accel.continuous,
                            bytes(date.encode("utf-8")),
                            bytes(time.encode("utf-8")),
                            )

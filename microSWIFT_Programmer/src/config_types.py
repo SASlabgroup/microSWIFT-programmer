@@ -39,3 +39,8 @@ class TimingConfig:
     duty_cycle: int
     gnss_max_acquisition_time: int
     tracking_number: int
+
+@dataclass
+class AccelerometerConfig:
+    enabled: bool
+    continuous: bool

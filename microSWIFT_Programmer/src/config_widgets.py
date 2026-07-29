@@ -3,7 +3,7 @@ import re
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import pyqtSignal, QSettings
 
-from config_types import CTConfig, LightConfig, TurbidityConfig, IridiumConfig, GNSSConfig, TimingConfig
+from config_types import AccelerometerConfig, CTConfig, LightConfig, TurbidityConfig, IridiumConfig, GNSSConfig, TimingConfig
 
 
 def _bool_from_settings(settings, key, default=False):
@@ -247,15 +247,31 @@ class AccelerometerConfigWidget(ConfigFrame):
         layout.addWidget(self.enableButton)
 
         self.enableButton.clicked.connect(self.configChanged)
+        self.enableButton.clicked.connect(self._on_enable_clicked)
+
+        self.continuousCheckbox = QtWidgets.QCheckBox("Run Accelerometer Continuously", parent=self)
+        self.continuousCheckbox.setEnabled(False)
+        self.continuousCheckbox.setFont(font12)
+        layout.addWidget(self.continuousCheckbox)
+
+    def _apply_internal_state(self):
+        self._on_enable_clicked()
+
+    def _on_enable_clicked(self):
+        enabled = self.enableButton.isChecked()
+        self.continuousCheckbox.setEnabled(enabled)
+
 
     def get_config(self):
-        return self.enableButton.isChecked()
+        return AccelerometerConfig(self.enableButton.isChecked(), self.continuousCheckbox.isChecked())
 
     def save_settings(self, settings):
         settings.setValue("accelerometerEnabled", self.enableButton.isChecked())
+        settings.setValue("accelerometerContinuous", self.continuousCheckbox.isChecked())
 
     def load_settings(self, settings):
         self.enableButton.setChecked(_bool_from_settings(settings, "accelerometerEnabled"))
+        self.continuousCheckbox.setChecked(_bool_from_settings(settings, "accelerometerContinuous"))
 
 
 # ---------------------------------------------------------------------------
